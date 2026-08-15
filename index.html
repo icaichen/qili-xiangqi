@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/redesign.css" />
     <link rel="stylesheet" href="/brand-v2.css" />
     <link rel="stylesheet" href="/online.css" />
+    <link rel="stylesheet" href="/tutorial.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -354,6 +355,7 @@
       </section>
 
       <section id="learnView" class="platform-view platform-page hidden"><div class="platform-page-header"><div><span class="eyebrow">LEARN</span><h1>学习中国象棋</h1><p>按照初学者真正需要掌握的顺序学习。</p></div><button class="button button-ghost" id="learnNotationButton">先学记谱</button></div><div class="curriculum-grid"><article class="curriculum-card platform-surface"><b>16</b><h2>规则与走子</h2><p>棋盘、九宫、河界、棋子走法、吃子和将帅照面。</p><button class="button button-primary curriculum-start" data-level="16">查看课程</button></article><article class="curriculum-card platform-surface"><b>15</b><h2>吃子、将军与一步意图</h2><p>子力价值、将军、一步杀、连续吃子。</p><button class="button button-ghost curriculum-start" data-level="15">查看课程</button></article><article class="curriculum-card platform-surface"><b>14</b><h2>应将、保护与交换</h2><p>躲、保、换，避免强子损失。</p><button class="button button-ghost curriculum-start" data-level="14">查看课程</button></article><article class="curriculum-card platform-surface"><b>13</b><h2>两子配合与基础布局</h2><p>两子配合、2–3步计算、顺炮和列炮。</p><button class="button button-ghost curriculum-start" data-level="13">查看课程</button></article></div><div id="curriculumDetail" class="platform-surface curriculum-detail hidden"></div></section>
+      <section id="lessonWorkspace" class="lesson-workspace platform-surface hidden" aria-live="polite"><aside class="lesson-sidebar"><div class="lesson-course-mark"><span>LEVEL</span><strong>16</strong></div><div><span class="eyebrow">互动课程</span><h2>规则与走子</h2></div><div class="lesson-progress"><div><span id="lessonProgressText">1 / 8</span><small>课程进度</small></div><div class="lesson-progress-track"><i id="lessonProgressFill"></i></div></div><div id="lessonStepRail" class="lesson-step-rail"></div></aside><section class="lesson-stage"><header class="lesson-stage-head"><div><span class="eyebrow" id="lessonKicker">第 1 课</span><h2 id="lessonTitle">认识棋盘</h2><p id="lessonInstruction">按照提示完成棋盘任务。</p></div><button id="lessonReset" class="button button-ghost">重做本节</button></header><div class="lesson-stage-grid"><div class="lesson-board-shell"><div id="lessonBoard" class="lesson-board" aria-label="互动教学棋盘"></div><div id="lessonFeedback" class="lesson-feedback neutral"><strong>轮到你</strong><span>按照提示在棋盘上完成任务。</span></div></div><aside class="lesson-teaching-card"><span class="eyebrow">只记这一点</span><h3 id="lessonHintTitle">棋子落在交叉点</h3><p id="lessonHint">先完成棋盘任务，再进入下一节。</p><div id="lessonRuleChips" class="lesson-rule-chips"></div></aside></div><footer class="lesson-stage-actions"><button id="lessonPrev" class="button button-ghost">上一节</button><button id="lessonNext" class="button button-primary" disabled>完成后继续</button></footer></section></section>
 
       <section id="reviewDropzone" class="review-dropzone platform-view hidden">
         <div class="drop-icon">谱</div>
@@ -461,6 +463,7 @@
     <script type="module" src="/engine-client.js"></script>
     <script type="module" src="/coach-tools.js"></script>
     <script type="module" src="/app.js"></script>
+    <script type="module" src="/tutorial-client.js"></script>
     <script type="module" src="/auth-client.js"></script>
     <script type="module" src="/identity-client.js"></script>
     <script type="module" src="/online-client.js"></script>

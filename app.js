@@ -1313,6 +1313,16 @@ document.querySelectorAll(".curriculum-start").forEach((button) => {
   });
 });
 
+window.QiliTutorialRules = {
+  ROWS,
+  COLS,
+  COLORS,
+  createEmptyBoard,
+  piece,
+  generatePseudoMoves,
+  applyMove,
+};
+
 const initialPlatformView = window.location.hash.replace("#", "");
 switchPlatformView(platformViews[initialPlatformView] ? initialPlatformView : "home");
 
