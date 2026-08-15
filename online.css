@@ -1,0 +1,226 @@
+/* Online Xiangqi MVP — functionality first */
+.online-entry-button { margin-top: 12px; }
+.online-page { min-height: calc(100vh - 48px); }
+.online-page-header { margin-bottom: 14px; }
+
+.online-lobby {
+  display: grid;
+  grid-template-columns: minmax(430px, 1.25fr) minmax(300px, .75fr);
+  gap: 14px;
+}
+
+.online-lobby-side { display: grid; gap: 14px; }
+.online-lobby-card { padding: 26px; }
+.online-lobby-card h2 { margin: 6px 0 22px; font-size: 30px; }
+.online-lobby-card h3 { margin: 5px 0 9px; font-size: 20px; }
+.online-lobby-card p { color: #777; font-size: 12px; line-height: 1.65; }
+.online-lobby-main { min-height: 360px; }
+
+.online-field { display: block; margin-top: 15px; }
+.online-field > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #777;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+.online-field input,
+.online-field select,
+.online-room-join input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #ddd9d2;
+  border-radius: 8px;
+  padding: 0 13px;
+  outline: none;
+  color: #222;
+  background: #fff;
+  font: inherit;
+}
+.online-field input:focus,
+.online-field select:focus,
+.online-room-join input:focus { border-color: #d83a2e; box-shadow: 0 0 0 3px rgba(216,58,46,.09); }
+.online-primary-actions { display: flex; gap: 9px; margin-top: 20px; }
+.online-primary-actions .button { min-width: 130px; }
+.online-status { min-height: 20px; margin: 14px 0 0; color: #777; font-size: 11px; }
+.online-status[data-kind="error"] { color: #c73328; }
+.online-room-join { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 14px; }
+
+.online-game-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(560px, 1fr) 260px;
+  gap: 12px;
+  align-items: stretch;
+}
+.online-player-column,
+.online-side-panel,
+.online-board-column { padding: 17px; }
+.online-player-column { display: flex; flex-direction: column; gap: 14px; }
+.online-player-card {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 0;
+}
+.online-player-card + .online-player-card { border-top: 1px solid #e8e5df; }
+.online-player-token {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #333;
+  border-radius: 50%;
+  background: #f7e4b7;
+  font-family: "Noto Serif SC", serif;
+  font-size: 17px;
+  font-weight: 700;
+}
+.online-player-card.red .online-player-token { color: #c63328; border-color: #c63328; }
+.online-player-card span,
+.online-room-meta span { display: block; color: #999; font-size: 9px; font-weight: 700; }
+.online-player-card strong { display: block; margin-top: 3px; font-size: 13px; }
+.online-clock {
+  grid-column: 1 / -1;
+  display: block;
+  padding: 9px 11px;
+  border-radius: 7px;
+  color: #777;
+  background: #f3f3f1;
+  font-size: 27px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .03em;
+}
+.online-clock.active { color: #fff; background: #191918; }
+.online-player-card.red .online-clock.active { background: #d83a2e; }
+.online-room-meta {
+  margin: auto 0;
+  padding: 14px 0;
+  border-top: 1px solid #e8e5df;
+  border-bottom: 1px solid #e8e5df;
+}
+.online-room-meta strong { display: block; margin: 5px 0 9px; font-size: 16px; letter-spacing: .08em; }
+.online-room-meta .button { width: 100%; padding: 7px 9px; font-size: 10px; }
+
+.online-board-column { text-align: center; }
+.online-game-state { min-height: 26px; margin-bottom: 10px; color: #555; font-size: 12px; font-weight: 700; }
+.online-xiangqi-board {
+  position: relative;
+  width: min(100%, 650px);
+  aspect-ratio: 8 / 9;
+  margin: 0 auto;
+  border: 7px solid #a96c37;
+  border-radius: 5px;
+  background:
+    linear-gradient(rgba(84,51,25,.33) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(84,51,25,.33) 1px, transparent 1px),
+    linear-gradient(145deg, #edca8a, #ddb36f);
+  background-size: 12.5% 11.111%;
+  box-shadow: inset 0 0 0 2px rgba(255,235,190,.55), 0 12px 24px rgba(60,38,20,.17);
+}
+.online-board-river {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 44.45%;
+  height: 11.11%;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  color: #6b4526;
+  background: #e4ba77;
+  font-family: "Noto Serif SC", serif;
+  font-size: clamp(20px, 2.2vw, 31px);
+  letter-spacing: .12em;
+  pointer-events: none;
+}
+#onlineBoardPoints { position: absolute; inset: 0; z-index: 2; }
+.online-board-point {
+  position: absolute;
+  width: clamp(38px, 5vw, 54px);
+  height: clamp(38px, 5vw, 54px);
+  transform: translate(-50%, -50%);
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+.online-piece {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border: 2px solid #342a22;
+  border-radius: 50%;
+  color: #30271f;
+  background: radial-gradient(circle at 34% 28%, #fff0c7, #e7bd77 67%, #c88d48);
+  box-shadow: inset 0 0 0 2px rgba(255,244,212,.72), 0 3px 7px rgba(62,36,16,.28);
+  font-family: "Noto Serif SC", serif;
+  font-size: clamp(17px, 2vw, 24px);
+  font-weight: 700;
+}
+.online-piece.red { color: #b92d24; border-color: #b92d24; }
+.online-board-point.selected .online-piece { box-shadow: 0 0 0 5px rgba(216,58,46,.2), 0 3px 7px rgba(62,36,16,.25); }
+.online-board-point.legal::after {
+  content: "";
+  position: absolute;
+  inset: 40%;
+  border-radius: 50%;
+  background: rgba(19,113,74,.7);
+}
+.online-board-point.capture::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border: 4px solid rgba(19,113,74,.62);
+  border-radius: 50%;
+}
+.online-game-actions { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+.online-game-actions .button { min-width: 82px; }
+.online-draw-offer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid rgba(216,58,46,.2);
+  border-radius: 8px;
+  background: rgba(216,58,46,.07);
+  text-align: left;
+  font-size: 11px;
+}
+.online-draw-offer > div { display: flex; gap: 6px; }
+
+.online-side-panel { display: flex; flex-direction: column; min-height: 560px; }
+.online-side-panel h2 { margin: 5px 0 12px; }
+.online-move-list {
+  flex: 1;
+  min-height: 260px;
+  max-height: 520px;
+  overflow: auto;
+  border-top: 1px solid #e7e4de;
+}
+.online-move-row {
+  display: grid;
+  grid-template-columns: 26px 30px 1fr;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  border-bottom: 1px solid #eeece7;
+  font-size: 10px;
+}
+.online-move-row span { color: #999; }
+.online-move-row strong { font-size: 12px; }
+.online-move-row em { color: #777; font-style: normal; }
+.online-empty { padding: 24px 0; color: #aaa; font-size: 11px; }
+.online-server-note { margin-top: 13px; padding-top: 13px; border-top: 1px solid #e7e4de; text-align: left; }
+.online-server-note strong { font-size: 11px; }
+.online-server-note p { margin: 5px 0 0; color: #888; font-size: 9px; line-height: 1.6; }
+
+@media (max-width: 1280px) {
+  .online-game-layout { grid-template-columns: 190px minmax(500px, 1fr) 220px; }
+  .online-lobby { grid-template-columns: 1fr 340px; }
+}

@@ -1,0 +1,1321 @@
+const ROWS = 10;
+const COLS = 9;
+const COLORS = { RED: "red", BLACK: "black" };
+const OPPOSITE = { red: "black", black: "red" };
+
+const PIECE_LABELS = {
+  red: { rook: "车", horse: "马", elephant: "相", advisor: "仕", general: "帅", cannon: "炮", pawn: "兵" },
+  black: { rook: "车", horse: "马", elephant: "象", advisor: "士", general: "将", cannon: "炮", pawn: "卒" },
+};
+
+const PIECE_VALUES = {
+  general: 10000,
+  rook: 900,
+  cannon: 450,
+  horse: 420,
+  elephant: 220,
+  advisor: 220,
+  pawn: 100,
+};
+
+const RED_NUMERALS = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
+
+const boardElement = document.querySelector("#boardPoints");
+const moveHistoryElement = document.querySelector("#moveHistory");
+const moveCountElement = document.querySelector("#moveCount");
+const statusBadgeElement = document.querySelector("#gameStatusBadge");
+const turnTextElement = document.querySelector("#turnText");
+const turnIndicatorElement = document.querySelector("#turnIndicator");
+const evaluationDisplayElement = document.querySelector("#evaluationDisplay");
+const lastMoveLabelElement = document.querySelector("#lastMoveLabel");
+const coachContentElement = document.querySelector("#coachContent");
+const analysisToggleElement = document.querySelector("#analysisToggle");
+const moveHintsToggleElement = document.querySelector("#moveHintsToggle");
+const notationBreakdownElement = document.querySelector("#notationBreakdown");
+const routePreviewModalElement = document.querySelector("#routePreviewModal");
+const routePreviewBoardElement = document.querySelector("#routePreviewBoard");
+const routePreviewTitleElement = document.querySelector("#routePreviewTitle");
+const routePreviewStepElement = document.querySelector("#routePreviewStep");
+const routePreviewEventElement = document.querySelector("#routePreviewEvent");
+const routePreviewCounterElement = document.querySelector("#routePreviewCounter");
+const routePreviewPrevElement = document.querySelector("#routePreviewPrev");
+const routePreviewNextElement = document.querySelector("#routePreviewNext");
+const routePreviewCloseElement = document.querySelector("#routePreviewClose");
+const notationModalElement = document.querySelector("#notationModal");
+const openNotationButtonElement = document.querySelector("#openNotationButton");
+const closeNotationButtonElement = document.querySelector("#closeNotationButton");
+const moveHintsElement = document.querySelector("#moveHints");
+const moveHintLegendElement = document.querySelector("#moveHintLegend");
+const levelSelectElement = document.querySelector("#levelSelect");
+const undoStepButtonElement = document.querySelector("#undoStepButton");
+const undoButtonElement = document.querySelector("#undoButton");
+const resumeButtonElement = document.querySelector("#resumeButton");
+const newGameButtonElement = document.querySelector("#newGameButton");
+const flipButtonElement = document.querySelector("#flipButton");
+const workspaceElement = document.querySelector(".workspace");
+const reviewDropzoneElement = document.querySelector("#reviewDropzone");
+const platformViews = {
+  home: document.querySelector("#homeView"), play: document.querySelector("#playView"),
+  train: document.querySelector("#trainView"), learn: document.querySelector("#learnView"),
+  review: document.querySelector("#reviewDropzone"), analysis: document.querySelector("#analysisView"),
+  profile: document.querySelector("#profileView"),
+  online: document.querySelector("#onlineView"),
+};
+const quickPlayButtonElement = document.querySelector("#quickPlayButton");
+const learnNotationButtonElement = document.querySelector("#learnNotationButton");
+const curriculumDetailElement = document.querySelector("#curriculumDetail");
+const engineStateElement = document.querySelector("#engineState");
+const engineClient = window.XiangqiEngineClient;
+const coachTools = window.XiangqiCoachTools;
+
+let board = createInitialBoard();
+let currentTurn = COLORS.RED;
+let selected = null;
+let legalTargets = [];
+let history = [];
+let snapshots = [cloneBoard(board)];
+let flipped = false;
+let locked = false;
+let gameOver = false;
+let coachAnalysis = null;
+let engineConnected = false;
+let engineError = null;
+let engineEvaluationCp = null;
+let pausedAfterUndo = false;
+let moveSuggestions = [];
+let suggestionRequestId = 0;
+let routePreviewState = { route: null, index: 0, title: "" };
+let aiCoachConfigured = false;
+let aiCoachServerAvailable = false;
+let aiCoachModel = "";
+let aiCoachRequestId = 0;
+
+function createEmptyBoard() {
+  return Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+}
+
+function piece(type, color) {
+  return { type, color, label: PIECE_LABELS[color][type] };
+}
+
+function createInitialBoard() {
+  const next = createEmptyBoard();
+  const backRank = ["rook", "horse", "elephant", "advisor", "general", "advisor", "elephant", "horse", "rook"];
+
+  backRank.forEach((type, col) => {
+    next[0][col] = piece(type, COLORS.BLACK);
+    next[9][col] = piece(type, COLORS.RED);
+  });
+
+  next[2][1] = piece("cannon", COLORS.BLACK);
+  next[2][7] = piece("cannon", COLORS.BLACK);
+  next[7][1] = piece("cannon", COLORS.RED);
+  next[7][7] = piece("cannon", COLORS.RED);
+
+  [0, 2, 4, 6, 8].forEach((col) => {
+    next[3][col] = piece("pawn", COLORS.BLACK);
+    next[6][col] = piece("pawn", COLORS.RED);
+  });
+
+  return next;
+}
+
+function cloneBoard(source) {
+  return source.map((row) => row.map((entry) => (entry ? { ...entry } : null)));
+}
+
+function inside(row, col) {
+  return row >= 0 && row < ROWS && col >= 0 && col < COLS;
+}
+
+function insidePalace(row, col, color) {
+  const rowAllowed = color === COLORS.RED ? row >= 7 && row <= 9 : row >= 0 && row <= 2;
+  return rowAllowed && col >= 3 && col <= 5;
+}
+
+function crossedRiver(row, color) {
+  return color === COLORS.RED ? row <= 4 : row >= 5;
+}
+
+function pushIfAvailable(moves, sourceBoard, row, col, color, captureOnly = false) {
+  if (!inside(row, col)) return;
+  const target = sourceBoard[row][col];
+  if (!target && !captureOnly) moves.push({ toRow: row, toCol: col });
+  if (target && target.color !== color) moves.push({ toRow: row, toCol: col });
+}
+
+function generatePseudoMoves(sourceBoard, row, col) {
+  const currentPiece = sourceBoard[row][col];
+  if (!currentPiece) return [];
+
+  const moves = [];
+  const { color, type } = currentPiece;
+
+  if (type === "rook" || type === "cannon") {
+    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    directions.forEach(([dr, dc]) => {
+      let r = row + dr;
+      let c = col + dc;
+      let screenFound = false;
+
+      while (inside(r, c)) {
+        const target = sourceBoard[r][c];
+
+        if (type === "rook") {
+          if (!target) {
+            moves.push({ toRow: r, toCol: c });
+          } else {
+            if (target.color !== color) moves.push({ toRow: r, toCol: c });
+            break;
+          }
+        } else if (!screenFound) {
+          if (!target) {
+            moves.push({ toRow: r, toCol: c });
+          } else {
+            screenFound = true;
+          }
+        } else if (target) {
+          if (target.color !== color) moves.push({ toRow: r, toCol: c });
+          break;
+        }
+
+        r += dr;
+        c += dc;
+      }
+    });
+  }
+
+  if (type === "horse") {
+    const patterns = [
+      { dr: -2, dc: -1, lr: -1, lc: 0 }, { dr: -2, dc: 1, lr: -1, lc: 0 },
+      { dr: 2, dc: -1, lr: 1, lc: 0 }, { dr: 2, dc: 1, lr: 1, lc: 0 },
+      { dr: -1, dc: -2, lr: 0, lc: -1 }, { dr: 1, dc: -2, lr: 0, lc: -1 },
+      { dr: -1, dc: 2, lr: 0, lc: 1 }, { dr: 1, dc: 2, lr: 0, lc: 1 },
+    ];
+
+    patterns.forEach(({ dr, dc, lr, lc }) => {
+      if (!inside(row + lr, col + lc) || sourceBoard[row + lr][col + lc]) return;
+      pushIfAvailable(moves, sourceBoard, row + dr, col + dc, color);
+    });
+  }
+
+  if (type === "elephant") {
+    [[-2, -2], [-2, 2], [2, -2], [2, 2]].forEach(([dr, dc]) => {
+      const destinationRow = row + dr;
+      const destinationCol = col + dc;
+      const eyeRow = row + dr / 2;
+      const eyeCol = col + dc / 2;
+      const staysHome = color === COLORS.RED ? destinationRow >= 5 : destinationRow <= 4;
+      if (inside(destinationRow, destinationCol) && staysHome && !sourceBoard[eyeRow][eyeCol]) {
+        pushIfAvailable(moves, sourceBoard, destinationRow, destinationCol, color);
+      }
+    });
+  }
+
+  if (type === "advisor") {
+    [[-1, -1], [-1, 1], [1, -1], [1, 1]].forEach(([dr, dc]) => {
+      const destinationRow = row + dr;
+      const destinationCol = col + dc;
+      if (insidePalace(destinationRow, destinationCol, color)) {
+        pushIfAvailable(moves, sourceBoard, destinationRow, destinationCol, color);
+      }
+    });
+  }
+
+  if (type === "general") {
+    [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
+      const destinationRow = row + dr;
+      const destinationCol = col + dc;
+      if (insidePalace(destinationRow, destinationCol, color)) {
+        pushIfAvailable(moves, sourceBoard, destinationRow, destinationCol, color);
+      }
+    });
+
+    const direction = color === COLORS.RED ? -1 : 1;
+    let scanRow = row + direction;
+    while (inside(scanRow, col)) {
+      const target = sourceBoard[scanRow][col];
+      if (target) {
+        if (target.type === "general" && target.color !== color) {
+          moves.push({ toRow: scanRow, toCol: col });
+        }
+        break;
+      }
+      scanRow += direction;
+    }
+  }
+
+  if (type === "pawn") {
+    const forward = color === COLORS.RED ? -1 : 1;
+    pushIfAvailable(moves, sourceBoard, row + forward, col, color);
+    if (crossedRiver(row, color)) {
+      pushIfAvailable(moves, sourceBoard, row, col - 1, color);
+      pushIfAvailable(moves, sourceBoard, row, col + 1, color);
+    }
+  }
+
+  return moves.map((move) => ({ ...move, fromRow: row, fromCol: col, piece: currentPiece }));
+}
+
+function applyMove(sourceBoard, move) {
+  const next = cloneBoard(sourceBoard);
+  const movingPiece = next[move.fromRow][move.fromCol];
+  const captured = next[move.toRow][move.toCol];
+  next[move.toRow][move.toCol] = movingPiece;
+  next[move.fromRow][move.fromCol] = null;
+  return { board: next, captured };
+}
+
+function findGeneral(sourceBoard, color) {
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      const entry = sourceBoard[row][col];
+      if (entry?.type === "general" && entry.color === color) return { row, col };
+    }
+  }
+  return null;
+}
+
+function isSquareAttacked(sourceBoard, row, col, byColor) {
+  for (let r = 0; r < ROWS; r += 1) {
+    for (let c = 0; c < COLS; c += 1) {
+      const entry = sourceBoard[r][c];
+      if (!entry || entry.color !== byColor) continue;
+      const attacks = generatePseudoMoves(sourceBoard, r, c);
+      if (attacks.some((move) => move.toRow === row && move.toCol === col)) return true;
+    }
+  }
+  return false;
+}
+
+function isInCheck(sourceBoard, color) {
+  const general = findGeneral(sourceBoard, color);
+  if (!general) return true;
+  return isSquareAttacked(sourceBoard, general.row, general.col, OPPOSITE[color]);
+}
+
+function legalMovesForPiece(sourceBoard, row, col) {
+  const entry = sourceBoard[row][col];
+  if (!entry) return [];
+  return generatePseudoMoves(sourceBoard, row, col).filter((move) => {
+    const result = applyMove(sourceBoard, move);
+    return !isInCheck(result.board, entry.color);
+  });
+}
+
+function generateLegalMoves(sourceBoard, color) {
+  const moves = [];
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      if (sourceBoard[row][col]?.color === color) {
+        moves.push(...legalMovesForPiece(sourceBoard, row, col));
+      }
+    }
+  }
+  return moves;
+}
+
+function materialEvaluation(sourceBoard) {
+  let score = 0;
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      const entry = sourceBoard[row][col];
+      if (!entry) continue;
+      const direction = entry.color === COLORS.BLACK ? 1 : -1;
+      const value = PIECE_VALUES[entry.type];
+      let positional = 0;
+
+      if (entry.type === "pawn") {
+        positional += crossedRiver(row, entry.color) ? 24 : 0;
+        positional += (4 - Math.abs(4 - col)) * 2;
+      }
+      if (entry.type === "horse" || entry.type === "cannon") {
+        positional += (4 - Math.abs(4 - col)) * 3;
+      }
+      if (entry.type === "rook") {
+        positional += (4 - Math.abs(4 - col));
+      }
+
+      score += direction * (value + positional);
+    }
+  }
+  return score;
+}
+
+function moveHeuristic(sourceBoard, move, color) {
+  const target = sourceBoard[move.toRow][move.toCol];
+  const moving = sourceBoard[move.fromRow][move.fromCol];
+  const result = applyMove(sourceBoard, move);
+  let score = color === COLORS.BLACK ? materialEvaluation(result.board) : -materialEvaluation(result.board);
+
+  if (target) score += PIECE_VALUES[target.type] * 0.65;
+  if (isInCheck(result.board, OPPOSITE[color])) score += 110;
+
+  const centerGain = Math.abs(move.fromCol - 4) - Math.abs(move.toCol - 4);
+  score += centerGain * 5;
+
+  const homeRow = color === COLORS.RED ? 9 : 0;
+  if (["horse", "cannon", "rook"].includes(moving.type) && move.fromRow === homeRow) score += 18;
+
+  if (isSquareAttacked(result.board, move.toRow, move.toCol, OPPOSITE[color])) {
+    score -= PIECE_VALUES[moving.type] * 0.18;
+  }
+
+  return score;
+}
+
+function rankMoves(sourceBoard, color, limit = 5) {
+  return generateLegalMoves(sourceBoard, color)
+    .map((move) => ({ ...move, score: moveHeuristic(sourceBoard, move, color) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+}
+
+function minimax(sourceBoard, depth, alpha, beta, maximizingBlack) {
+  if (depth === 0 || !findGeneral(sourceBoard, COLORS.RED) || !findGeneral(sourceBoard, COLORS.BLACK)) {
+    return materialEvaluation(sourceBoard);
+  }
+
+  const color = maximizingBlack ? COLORS.BLACK : COLORS.RED;
+  const moves = generateLegalMoves(sourceBoard, color);
+  if (!moves.length) return maximizingBlack ? -99999 : 99999;
+
+  if (maximizingBlack) {
+    let best = -Infinity;
+    for (const move of moves) {
+      const result = applyMove(sourceBoard, move);
+      best = Math.max(best, minimax(result.board, depth - 1, alpha, beta, false));
+      alpha = Math.max(alpha, best);
+      if (beta <= alpha) break;
+    }
+    return best;
+  }
+
+  let best = Infinity;
+  for (const move of moves) {
+    const result = applyMove(sourceBoard, move);
+    best = Math.min(best, minimax(result.board, depth - 1, alpha, beta, true));
+    beta = Math.min(beta, best);
+    if (beta <= alpha) break;
+  }
+  return best;
+}
+
+function engineSettings() {
+  return coachTools.getLevelSettings(levelSelectElement.value);
+}
+
+function formatEngineScore(cp) {
+  if (!Number.isFinite(cp)) return "—";
+  if (Math.abs(cp) >= 90000) return cp > 0 ? "将杀" : "被将杀";
+  const value = cp / 100;
+  return (value > 0 ? "+" : "") + value.toFixed(2);
+}
+
+function pvToNotation(sourceBoard, pv, limit = 4) {
+  let working = cloneBoard(sourceBoard);
+  const labels = [];
+  for (const uci of (pv || []).slice(0, limit)) {
+    const move = engineClient.uciToMove(uci, working);
+    if (!move) break;
+    labels.push(formatMove(move, working));
+    working = applyMove(working, move).board;
+  }
+  return labels.join("，");
+}
+
+async function initializeEngine() {
+  try {
+    engineStateElement.textContent = "正在连接 Pikafish…";
+    const health = await engineClient.health();
+    if (!health.configured) throw new Error("Pikafish 尚未配置");
+    engineConnected = true;
+    engineError = null;
+    aiCoachServerAvailable = Number(health.apiVersion || 0) >= 2;
+    aiCoachConfigured = Boolean(health.coach?.configured);
+    aiCoachModel = health.coach?.model || "";
+    engineStateElement.textContent = health.ready ? "Pikafish 已连接" : "Pikafish 已就绪";
+    window.setTimeout(refreshMoveSuggestions, 0);
+    return true;
+  } catch (error) {
+    engineConnected = false;
+    engineError = error instanceof Error ? error.message : "引擎连接失败";
+    engineStateElement.textContent = "连接失败：" + engineError;
+    return false;
+  }
+}
+
+function hintCoordinates(row, col) {
+  return {
+    x: (flipped ? 8 - col : col) * 100,
+    y: (flipped ? 9 - row : row) * 100,
+  };
+}
+
+function clearMoveSuggestions() {
+  suggestionRequestId += 1;
+  moveSuggestions = [];
+  renderMoveHints();
+}
+
+function renderMoveHints() {
+  if (!moveHintsElement || !moveHintLegendElement) return;
+  const visible = Boolean(
+    moveHintsToggleElement?.checked &&
+    currentTurn === COLORS.RED &&
+    !locked &&
+    !gameOver &&
+    moveSuggestions.length
+  );
+
+  moveHintLegendElement.classList.toggle("hidden", !visible);
+  if (!visible) {
+    moveHintsElement.innerHTML = "";
+    return;
+  }
+
+  const colors = ["#237a52", "#3577b8", "#7d817f"];
+  const widths = [12, 9, 7];
+  const opacities = [0.9, 0.78, 0.66];
+  const definitions = colors.map((color, index) =>
+    '<marker id="hint-arrow-' + index + '" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5.5 L0,11 Z" fill="' + color + '"></path></marker>'
+  ).join("");
+
+  const arrows = moveSuggestions.slice(0, 3).map((item, index) => {
+    const from = hintCoordinates(item.move.fromRow, item.move.fromCol);
+    const to = hintCoordinates(item.move.toRow, item.move.toCol);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const startPadding = 37;
+    const endPadding = 42;
+    const x1 = from.x + (dx / length) * startPadding;
+    const y1 = from.y + (dy / length) * startPadding;
+    const x2 = to.x - (dx / length) * endPadding;
+    const y2 = to.y - (dy / length) * endPadding;
+    const badgeX = x1 + (x2 - x1) * 0.68;
+    const badgeY = y1 + (y2 - y1) * 0.68;
+    return '<g class="move-hint">' +
+      '<line class="move-hint-line" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + colors[index] + '" stroke-width="' + widths[index] + '" opacity="' + opacities[index] + '" marker-end="url(#hint-arrow-' + index + ')"></line>' +
+      '<g class="move-hint-rank" transform="translate(' + badgeX + ' ' + badgeY + ')"><circle r="18" fill="' + colors[index] + '"></circle><text y="1">' + (index + 1) + '</text></g>' +
+    '</g>';
+  }).join("");
+
+  moveHintsElement.innerHTML = '<defs>' + definitions + '</defs>' + arrows;
+}
+
+async function refreshMoveSuggestions() {
+  const requestId = ++suggestionRequestId;
+  moveSuggestions = [];
+  renderMoveHints();
+
+  if (!moveHintsToggleElement?.checked || !engineConnected || locked || gameOver || currentTurn !== COLORS.RED || pausedAfterUndo) return;
+
+  try {
+    engineStateElement.textContent = "Pikafish 正在生成棋盘候选…";
+    const settings = engineSettings();
+    const analysis = await engineClient.analyze(board, COLORS.RED, {
+      depth: Math.max(8, Math.min(13, settings.depth)),
+      multiPv: 3,
+    });
+    if (requestId !== suggestionRequestId || locked || currentTurn !== COLORS.RED || gameOver) return;
+    moveSuggestions = analysis.lines
+      .filter((line) => line.parsedMove)
+      .slice(0, 3)
+      .map((line) => ({ move: line.parsedMove, score: line.numericScore }));
+    engineEvaluationCp = analysis.lines[0]?.numericScore ?? engineEvaluationCp;
+    renderEvaluation();
+    renderMoveHints();
+    engineStateElement.textContent = "Pikafish 已连接 · 候选箭头已更新";
+  } catch (error) {
+    if (requestId !== suggestionRequestId) return;
+    moveSuggestions = [];
+    renderMoveHints();
+    engineStateElement.textContent = "候选箭头暂时不可用";
+  }
+}
+
+async function chooseComputerMove() {
+  const settings = engineSettings();
+  const analysis = await engineClient.analyze(board, COLORS.BLACK, {
+    depth: settings.depth,
+    multiPv: settings.multiPv,
+  });
+  const selectedLine = coachTools.chooseLine(analysis.lines, levelSelectElement.value);
+  if (!selectedLine?.parsedMove) return null;
+  return { move: selectedLine.parsedMove, analysis, selectedLine };
+}
+function sameMove(a, b) {
+  return a.fromRow === b.fromRow && a.fromCol === b.fromCol && a.toRow === b.toRow && a.toCol === b.toCol;
+}
+
+function fileName(col, color) {
+  return color === COLORS.RED ? RED_NUMERALS[8 - col] : String(col + 1);
+}
+
+function distanceName(distance, color) {
+  return color === COLORS.RED ? RED_NUMERALS[distance - 1] : String(distance);
+}
+
+function formatMove(move, sourceBoard) {
+  const moving = sourceBoard[move.fromRow][move.fromCol] ?? move.piece;
+  if (!moving) return "未知着法";
+
+  const fromFile = fileName(move.fromCol, moving.color);
+  const toFile = fileName(move.toCol, moving.color);
+  const vertical = move.fromCol === move.toCol;
+  let action;
+  let destination;
+
+  if (!vertical) {
+    const movingForward = moving.color === COLORS.RED ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+    if (["horse", "elephant", "advisor"].includes(moving.type)) {
+      action = movingForward ? "进" : "退";
+      destination = toFile;
+    } else if (move.fromRow === move.toRow) {
+      action = "平";
+      destination = toFile;
+    } else {
+      action = movingForward ? "进" : "退";
+      destination = distanceName(Math.abs(move.toRow - move.fromRow), moving.color);
+    }
+  } else {
+    const movingForward = moving.color === COLORS.RED ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+    action = movingForward ? "进" : "退";
+    destination = distanceName(Math.abs(move.toRow - move.fromRow), moving.color);
+  }
+
+  return `${moving.label}${fromFile}${action}${destination}`;
+}
+
+function describeMove(sourceBoard, move) {
+  const moving = sourceBoard[move.fromRow][move.fromCol];
+  const captured = sourceBoard[move.toRow][move.toCol];
+  const result = applyMove(sourceBoard, move);
+  const facts = [];
+
+  if (captured) facts.push(`直接取得了对方的${captured.label}`);
+  if (isInCheck(result.board, OPPOSITE[moving.color])) facts.push("形成将军，迫使对手立即应对");
+
+  const homeRow = moving.color === COLORS.RED ? 9 : 0;
+  if (["horse", "cannon", "rook"].includes(moving.type) && move.fromRow === homeRow) {
+    facts.push(`让${moving.label}离开初始位置，改善了子力活动`);
+  }
+
+  const wasCentral = Math.abs(move.fromCol - 4);
+  const nowCentral = Math.abs(move.toCol - 4);
+  if (nowCentral < wasCentral) facts.push("向中路靠拢，增加了对关键线路的控制");
+
+  if (isSquareAttacked(result.board, move.toRow, move.toCol, OPPOSITE[moving.color])) {
+    facts.push(`但落点上的${moving.label}会受到对方攻击，需要继续计算交换是否划算`);
+  }
+
+  if (!facts.length) facts.push("这是一手改善棋形的安静着，需要结合对方下一步威胁判断价值");
+  return facts;
+}
+
+function principleForMove(sourceBoard, move) {
+  const moving = sourceBoard[move.fromRow][move.fromCol];
+  const target = sourceBoard[move.toRow][move.toCol];
+  const result = applyMove(sourceBoard, move);
+
+  if (isInCheck(result.board, OPPOSITE[moving.color])) {
+    return "出现将军、吃子等强制手段时，优先计算对手所有被迫应对，再判断进攻是否持续。";
+  }
+  if (target) {
+    return "吃子之前不要只计算眼前收益，还要检查吃完以后，这个棋子是否会被反吃或被更强的先手攻击。";
+  }
+  if (["horse", "cannon", "rook"].includes(moving.type)) {
+    return "开局阶段应让更多棋子参与，而不是连续移动同一个棋子；出子速度决定谁先获得主动。";
+  }
+  return "每步先问三个问题：对手威胁什么、我有没有强制手段、这一步是否让最差的棋子变得更有用。";
+}
+
+function buildCoachAnalysis(sourceBoard, move, beforeAnalysis, afterAnalysis) {
+  return coachTools.buildCoachAnalysis({
+    sourceBoard,
+    move,
+    beforeAnalysis,
+    afterAnalysis,
+    adapters: {
+      cloneBoard,
+      applyMove,
+      isInCheck,
+      isSquareAttacked,
+      formatMove,
+      uciToMove: engineClient.uciToMove,
+      moveToUci: engineClient.moveToUci,
+      pieceValues: PIECE_VALUES,
+      opposite: OPPOSITE,
+      generateLegalMoves,
+    },
+  });
+}
+
+function performMove(move, color) {
+  const sourceBoard = cloneBoard(board);
+  const result = applyMove(board, move);
+  const notation = formatMove(move, sourceBoard);
+
+  board = result.board;
+  history.push({
+    color,
+    notation,
+    move: { ...move },
+    captured: result.captured,
+  });
+  snapshots.push(cloneBoard(board));
+  lastMoveLabelElement.textContent = `${color === COLORS.RED ? "你" : "电脑"}：${notation}`;
+
+  return { sourceBoard, result, notation };
+}
+
+async function performHumanMove(move) {
+  if (locked || gameOver || pausedAfterUndo) return;
+  clearMoveSuggestions();
+  locked = true;
+  selected = null;
+  legalTargets = [];
+  if (!engineConnected && !(await initializeEngine())) { locked = false; render(); return; }
+  const sourceBoard = cloneBoard(board);
+  performMove(move, COLORS.RED);
+  currentTurn = COLORS.BLACK;
+  engineStateElement.textContent = "Pikafish 正在比较两条路线…";
+  render();
+  if (finishIfNeeded()) return;
+  try {
+    const settings = engineSettings();
+    if (analysisToggleElement.checked) {
+      const coachDepth = Math.max(8, Math.min(14, settings.depth));
+      const before = await engineClient.analyze(sourceBoard, COLORS.RED, { depth: coachDepth, multiPv: 8 });
+      const after = await engineClient.analyze(board, COLORS.BLACK, { depth: coachDepth, multiPv: 3 });
+      coachAnalysis = buildCoachAnalysis(sourceBoard, move, before, after);
+      engineEvaluationCp = -(after.lines[0]?.numericScore ?? 0);
+      requestAiCoachExplanation(coachAnalysis);
+      renderCoach();
+      renderEvaluation();
+    }
+    await performComputerMove();
+  } catch (error) {
+    engineConnected = false;
+    engineError = error instanceof Error ? error.message : "Pikafish 分析失败";
+    engineStateElement.textContent = "引擎错误：" + engineError;
+    locked = false;
+    render();
+  }
+}
+
+async function performComputerMove() {
+  if (gameOver) return;
+  engineStateElement.textContent = "Pikafish 正在选择应对…";
+  const choice = await chooseComputerMove();
+  if (!choice) { locked = false; finishIfNeeded(); return; }
+  engineEvaluationCp = -(choice.analysis.lines[0]?.numericScore ?? 0);
+  performMove(choice.move, COLORS.BLACK);
+  currentTurn = COLORS.RED;
+  locked = false;
+  engineStateElement.textContent = "Pikafish 已连接";
+  render();
+  if (!finishIfNeeded()) refreshMoveSuggestions();
+}
+
+function finishIfNeeded() {
+  const redGeneral = findGeneral(board, COLORS.RED);
+  const blackGeneral = findGeneral(board, COLORS.BLACK);
+  const legal = generateLegalMoves(board, currentTurn);
+
+  if (!redGeneral || !blackGeneral || legal.length === 0) {
+    gameOver = true;
+    locked = true;
+    const winner = !redGeneral || (currentTurn === COLORS.RED && legal.length === 0) ? "黑方" : "红方";
+    statusBadgeElement.textContent = `${winner}获胜`;
+    turnTextElement.textContent = "本局结束";
+    lastMoveLabelElement.textContent = `${winner}获胜 · 可以重新开始或悔棋`;
+    renderBoard();
+    return true;
+  }
+  return false;
+}
+
+function handlePointClick(row, col) {
+  if (locked || gameOver || currentTurn !== COLORS.RED) return;
+  const targetPiece = board[row][col];
+
+  if (selected) {
+    const legalMove = legalTargets.find((move) => move.toRow === row && move.toCol === col);
+    if (legalMove) {
+      performHumanMove(legalMove);
+      return;
+    }
+
+    if (targetPiece?.color === COLORS.RED) {
+      selected = { row, col };
+      legalTargets = legalMovesForPiece(board, row, col);
+    } else {
+      selected = null;
+      legalTargets = [];
+    }
+    renderBoard();
+    return;
+  }
+
+  if (targetPiece?.color === COLORS.RED) {
+    selected = { row, col };
+    legalTargets = legalMovesForPiece(board, row, col);
+    renderBoard();
+  }
+}
+
+function renderBoard() {
+  boardElement.innerHTML = "";
+  const lastHistory = history.at(-1);
+
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      const point = document.createElement("button");
+      const visualCol = flipped ? 8 - col : col;
+      const visualRow = flipped ? 9 - row : row;
+      point.className = "board-point";
+      point.style.left = `${(visualCol / 8) * 100}%`;
+      point.style.top = `${(visualRow / 9) * 100}%`;
+      point.setAttribute("aria-label", `第 ${row + 1} 行，第 ${col + 1} 列`);
+      point.addEventListener("click", () => handlePointClick(row, col));
+
+      const isSelected = selected?.row === row && selected?.col === col;
+      const legalMove = legalTargets.find((move) => move.toRow === row && move.toCol === col);
+      const entry = board[row][col];
+
+      if (isSelected) point.classList.add("selected");
+      if (legalMove) point.classList.add(entry ? "capture" : "legal");
+      if (entry?.color === COLORS.RED && currentTurn === COLORS.RED && !locked) point.classList.add("selectable");
+
+      if (lastHistory?.move.fromRow === row && lastHistory?.move.fromCol === col) point.classList.add("last-from");
+      if (lastHistory?.move.toRow === row && lastHistory?.move.toCol === col) point.classList.add("last-to");
+
+      if (entry) {
+        const pieceElement = document.createElement("span");
+        pieceElement.className = `piece ${entry.color}-piece`;
+        pieceElement.textContent = entry.label;
+        point.appendChild(pieceElement);
+      }
+
+      boardElement.appendChild(point);
+    }
+  }
+}
+
+function renderHistory() {
+  moveCountElement.textContent = `${history.length} 手`;
+  undoStepButtonElement.disabled = history.length === 0 || locked;
+  undoButtonElement.disabled = history.length === 0 || locked;
+  resumeButtonElement.classList.toggle("hidden", !pausedAfterUndo);
+
+  if (!history.length) {
+    moveHistoryElement.className = "move-history empty-state";
+    moveHistoryElement.textContent = "开始走棋后，这里会记录完整棋谱。";
+    return;
+  }
+
+  moveHistoryElement.className = "move-history";
+  const rows = [];
+  for (let index = 0; index < history.length; index += 2) {
+    const redMove = history[index];
+    const blackMove = history[index + 1];
+    rows.push(`
+      <div class="move-row">
+        <span class="move-number">${Math.floor(index / 2) + 1}.</span>
+        <span class="red-move">${redMove?.notation ?? ""}</span>
+        <span class="black-move">${blackMove?.notation ?? ""}</span>
+      </div>
+    `);
+  }
+  moveHistoryElement.innerHTML = rows.join("");
+  moveHistoryElement.scrollTop = moveHistoryElement.scrollHeight;
+}
+
+function renderStatus() {
+  if (gameOver) return;
+
+  if (locked) {
+    statusBadgeElement.textContent = "电脑思考中";
+    statusBadgeElement.style.color = "#34423a";
+    statusBadgeElement.style.background = "#e8ece9";
+    turnTextElement.textContent = "电脑正在思考";
+    turnIndicatorElement.className = "turn-dot black";
+    return;
+  }
+
+  const redTurn = currentTurn === COLORS.RED;
+  statusBadgeElement.textContent = redTurn ? "红方走棋" : "黑方走棋";
+  statusBadgeElement.style.color = redTurn ? "#a64335" : "#34423a";
+  statusBadgeElement.style.background = redTurn ? "#f7e9e5" : "#e8ece9";
+  turnTextElement.textContent = redTurn ? "轮到红方" : "轮到黑方";
+  turnIndicatorElement.className = `turn-dot ${redTurn ? "red" : "black"}`;
+}
+
+function renderEvaluation() {
+  if (engineEvaluationCp == null) { evaluationDisplayElement.innerHTML = "<span>引擎</span><strong>等待分析</strong>"; return; }
+  const score = engineEvaluationCp;
+  const label = score > 180 ? "红方明显占优" : score > 60 ? "红方稍优" : score < -180 ? "黑方明显占优" : score < -60 ? "黑方稍优" : "均势";
+  evaluationDisplayElement.innerHTML = "<span>" + formatEngineScore(score) + "</span><strong>" + label + "</strong>";
+}
+
+function candidateRowsHtml(candidates) {
+  return candidates.map((candidate) =>
+    '<div class="candidate-row"><span class="candidate-rank">' + candidate.rank + '</span><strong>' + candidate.notation + (candidate.selected ? ' · 你的选择' : '') + '</strong><span class="candidate-score">' + candidate.score + '</span></div>'
+  ).join('');
+}
+
+function verifiedFactsHtml(facts, emptyText = "没有命中可验证规则。") {
+  if (!facts?.length) return '<div class="verified-empty">' + emptyText + '</div>';
+  return '<div class="verified-fact-list">' + facts.map((entry) =>
+    '<article class="verified-fact ' + entry.severity + '">' +
+      '<div class="verified-fact-heading"><strong>' + entry.title + '</strong><span>' + entry.confidence + '</span></div>' +
+      '<p>' + entry.detail + '</p>' +
+    '</article>'
+  ).join('') + '</div>';
+}
+
+function comparisonFactsHtml(items) {
+  if (!items?.length) return '';
+  return '<div class="verified-differences">' + items.map((item) => '<p>' + item + '</p>').join('') + '</div>';
+}
+
+function routeComparisonHtml(items) {
+  if (!items?.length) return '';
+  return '<div class="route-material-summary"><strong>当前主变化中的子力结果</strong>' + items.map((item) => '<p>' + item + '</p>').join('') + '</div>';
+}
+
+function compactBoardForAi(sourceBoard) {
+  return sourceBoard.map((row) => row.map((entry) => entry ? entry.color + ":" + entry.type + ":" + entry.label : null));
+}
+
+function buildAiCoachCase(analysis) {
+  const evidenceCatalog = [
+    { id: "board-position", type: "board-position", text: "完整棋盘位置已提供；row 0 是黑方底线，row 9 是红方底线。" },
+    { id: "engine-choice", type: "engine-choice", text: "你的走法：" + analysis.moveNotation + "；Pikafish首选：" + analysis.bestMove + "。" },
+    { id: "engine-gap", type: "engine-gap", text: "评价差：" + formatEngineScore(analysis.gap) + "；你的候选排名：" + (analysis.moveRank || "前五之外") + "。" },
+  ];
+
+  const addFacts = (prefix, facts) => {
+    (facts || []).forEach((fact, index) => evidenceCatalog.push({
+      id: prefix + "-" + (index + 1),
+      type: fact.type,
+      text: fact.title + "：" + fact.detail,
+    }));
+  };
+  addFacts("chosen-fact", analysis.chosenFacts);
+  addFacts("best-fact", analysis.bestFacts);
+  addFacts("reply-fact", analysis.replyFacts);
+  (analysis.deterministicDifferences || []).forEach((text, index) => evidenceCatalog.push({ id: "difference-" + (index + 1), type: "comparison", text }));
+  (analysis.routeComparisons || []).forEach((text, index) => evidenceCatalog.push({ id: "route-result-" + (index + 1), type: text.includes("净失") ? "route-material-loss" : "route-material", text }));
+  evidenceCatalog.push({ id: "signals-chosen", type: "position-signals", text: "你的走法后局面指标：" + JSON.stringify(analysis.signals?.chosen || {}) });
+  evidenceCatalog.push({ id: "signals-best", type: "position-signals", text: "首选着后局面指标：" + JSON.stringify(analysis.signals?.best || {}) });
+
+  const routeForAi = (route, prefix) => (route?.steps || []).slice(0, 8).map((step, index) => {
+    const id = prefix + "-" + (index + 1);
+    const text = step.notation + (step.facts?.length ? "；确定事实：" + step.facts.map((fact) => fact.title + "（" + fact.detail + "）").join("；") : "");
+    evidenceCatalog.push({ id, text });
+    return { id, notation: step.notation, facts: step.facts?.map((fact) => ({ type: fact.type, title: fact.title, detail: fact.detail })) || [] };
+  });
+
+  return {
+    move: {
+      notation: analysis.moveNotation,
+      bestMove: analysis.bestMove,
+      selectedIsBest: analysis.selectedIsBest,
+      rank: analysis.moveRank,
+      gap: analysis.gap,
+      raw: analysis.moveRaw,
+      bestRaw: analysis.bestMoveRaw,
+    },
+    engine: {
+      chosenScore: analysis.chosenScore,
+      bestScore: analysis.bestScore,
+      opponentMove: analysis.opponentMove,
+    },
+    board: compactBoardForAi(analysis.sourceBoard),
+    signals: analysis.signals || {},
+    routes: {
+      your: routeForAi(analysis.routes?.your, "your-route"),
+      best: routeForAi(analysis.routes?.best, "best-route"),
+    },
+    evidenceCatalog,
+  };
+}
+
+function requestAiCoachExplanation(analysis) {
+  const requestId = ++aiCoachRequestId;
+  if (!aiCoachServerAvailable) {
+    analysis.aiCoach = { state: "unavailable", reason: "restart" };
+    renderCoach();
+    return;
+  }
+  if (!aiCoachConfigured) {
+    analysis.aiCoach = { state: "unavailable", reason: "key" };
+    renderCoach();
+    return;
+  }
+
+  analysis.aiCoach = { state: "loading" };
+  renderCoach();
+  engineClient.explainCoach(buildAiCoachCase(analysis)).then((result) => {
+    if (requestId !== aiCoachRequestId || coachAnalysis !== analysis) return;
+    analysis.aiCoach = { state: "ready", ...result };
+    renderCoach();
+  }).catch((error) => {
+    if (requestId !== aiCoachRequestId || coachAnalysis !== analysis) return;
+    analysis.aiCoach = { state: "error", message: error instanceof Error ? error.message : "AI教练请求失败" };
+    renderCoach();
+  });
+}
+
+function beginnerVerdictHtml(analysis) {
+  if (analysis.selectedIsBest) return '<span class="beginner-judgment good">这步很好</span><h3>' + analysis.moveNotation + ' 就是当前首选</h3><p>这一步不用纠正。下面只看它最值得你理解的棋理。</p>';
+  if (analysis.gap < 30) return '<span class="beginner-judgment good">这步没错</span><h3>' + analysis.moveNotation + ' 可以下</h3><p>它和 ' + analysis.bestMove + ' 的评价非常接近。重点不是记住“唯一答案”，而是理解两种选择有什么不同。</p>';
+  if (analysis.gap < 100) return '<span class="beginner-judgment warning">可以下，但有更准确的选择</span><h3>先比较 ' + analysis.moveNotation + ' 和 ' + analysis.bestMove + '</h3><p>你的走法没有立刻输棋，但首选着更稳或更主动。下面只解释最重要的区别。</p>';
+  return '<span class="beginner-judgment danger">这步需要注意</span><h3>' + analysis.bestMove + ' 明显更好</h3><p>这次不是小差别。先看你的走法给了对手什么机会，再看首选着怎么避免。</p>';
+}
+
+function aiCoachHtml(analysis) {
+  const ai = analysis.aiCoach;
+  if (!ai || ai.state === "loading") {
+    return '<article class="coach-card ai-teacher-card loading"><span class="card-kicker">AI 教练 · 初学者模式</span><h3>正在把计算翻译成棋理…</h3><p>不是复述主变化，而是在比较两条路线里最值得你学的一件事。</p></article>';
+  }
+  if (ai.state === "unavailable") {
+    const message = ai.reason === "restart"
+      ? '本地引擎服务还是旧版本。重启 npm run dev 后才会出现 AI 教练接口。'
+      : 'AI 教练接口已经接好，但服务器没有 GEMINI_API_KEY。Pikafish 和确定性分析仍可正常使用。';
+    return '<article class="coach-card neutral ai-unavailable"><span class="card-kicker">AI 教练未启用</span><h3>目前只能显示可验证分析</h3><p>' + message + '</p></article>';
+  }
+  if (ai.state === "error") {
+    return '<article class="coach-card warning"><span class="card-kicker">AI 教练请求失败</span><h3>这次只保留确定性分析</h3><p>' + ai.message + '</p></article>';
+  }
+
+  const routeKey = analysis.selectedIsBest || analysis.sameRoute ? "your" : "best";
+  const confidenceLabel = ai.confidence === "high" ? "高" : ai.confidence === "medium" ? "中" : "低";
+  const lessonFocus = ai.teaching?.focus?.concept || "看清这一手的直接作用";
+  const lessonLevel = ai.teaching?.stage?.level ? ai.teaching.stage.level + "级重点" : "基础重点";
+  return '<article class="coach-card ai-teacher-card">' +
+    '<span class="card-kicker">AI 教练 · 初学者模式</span>' +
+    '<div class="teacher-focus"><span>' + lessonLevel + '</span><strong>' + lessonFocus + '</strong></div>' +
+    '<h3>' + ai.headline + '</h3>' +
+    '<div class="teacher-question"><span>先看棋盘</span><strong>' + ai.question + '</strong></div>' +
+    '<div class="teacher-section"><strong>答案与原因</strong><p>' + ai.coreReason + '</p></div>' +
+    '<div class="teacher-section"><strong>和另一手差在哪里？</strong><p>' + ai.comparison + '</p></div>' +
+    '<div class="teacher-section show-me-section"><strong>给我看</strong><p>' + ai.showMe + '</p><button class="button button-primary route-preview-trigger" data-route="' + routeKey + '">在棋盘上走给我看</button></div>' +
+    '<div class="teacher-memory"><span>下次记住</span><strong>' + ai.remember + '</strong></div>' +
+    '<div class="teacher-confidence">解释置信度：' + confidenceLabel + (ai.status === "uncertain" ? ' · AI明确标记为不确定' : '') + '</div>' +
+  '</article>';
+}
+
+function renderCoach() {
+  if (!analysisToggleElement.checked) {
+    coachContentElement.innerHTML = '<article class="coach-card neutral"><span class="card-kicker">实时分析已关闭</span><h3>独立思考模式</h3><p>打开后只显示确定性规则命中的棋理证据，以及折叠的原始引擎数据。</p></article>';
+    return;
+  }
+
+  if (!coachAnalysis) {
+    coachContentElement.innerHTML = '<article class="coach-card neutral beginner-empty"><span class="card-kicker">初学者教练</span><h3>走一步，我告诉你真正该看什么</h3><p>先判断这步有没有问题，再只讲一个最重要的原因，并用棋盘主变化演示。引擎分数和技术数据默认隐藏。</p></article>';
+    return;
+  }
+
+  const qualityClass = coachAnalysis.quality === "good" ? "good" : "warning";
+  const rankText = coachAnalysis.moveRank ? '第 ' + coachAnalysis.moveRank + ' 候选' : '未进入前五候选';
+  const routeButtons =
+    '<div class="route-view-actions">' +
+      '<button class="button button-ghost route-preview-trigger" data-route="your">' + (coachAnalysis.selectedIsBest ? '在棋盘查看主变化' : '在棋盘查看你的路线') + '</button>' +
+      (coachAnalysis.sameRoute ? '' : '<button class="button button-primary route-preview-trigger" data-route="best">在棋盘查看首选路线</button>') +
+    '</div>';
+
+  const evidenceSection = coachAnalysis.hasVerifiedReason
+    ? '<details class="engine-details verified-evidence-panel">' +
+        '<summary>查看这段分析用了哪些可验证证据</summary>' +
+        '<div class="verified-evidence-content">' +
+          verifiedFactsHtml(coachAnalysis.chosenFacts, '你的走法没有命中直接战术规则。') +
+          comparisonFactsHtml(coachAnalysis.deterministicDifferences) +
+          (coachAnalysis.bestFacts.length ? '<div class="evidence-subsection"><strong>首选着的可验证作用</strong>' + verifiedFactsHtml(coachAnalysis.bestFacts) + '</div>' : '') +
+          (coachAnalysis.replyFacts.length ? '<div class="evidence-subsection"><strong>对手回应中的明确威胁：' + coachAnalysis.opponentMove + '</strong>' + verifiedFactsHtml(coachAnalysis.replyFacts) + '</div>' : '') +
+          routeComparisonHtml(coachAnalysis.routeComparisons) +
+        '</div>' +
+      '</details>'
+    : '';
+
+  coachContentElement.innerHTML =
+    '<article class="coach-card beginner-verdict-card ' + qualityClass + '">' + beginnerVerdictHtml(coachAnalysis) + '</article>' +
+    aiCoachHtml(coachAnalysis) +
+    evidenceSection +
+    '<details class="engine-details raw-engine-panel">' +
+      '<summary>查看Pikafish原始数据与主变化</summary>' +
+      '<div class="raw-engine-content">' +
+        '<div class="engine-fact-grid">' +
+          '<div><span>你的评价</span><strong>' + formatEngineScore(coachAnalysis.chosenScore) + '</strong></div>' +
+          '<div><span>首选评价</span><strong>' + formatEngineScore(coachAnalysis.bestScore) + '</strong></div>' +
+          '<div><span>评价差</span><strong>' + formatEngineScore(coachAnalysis.gap) + '</strong></div>' +
+        '</div>' +
+        '<p><strong>候选排名：</strong>' + rankText + '</p>' +
+        '<p><strong>对手首选回应：</strong>' + coachAnalysis.rawEngine.opponentMove + '</p>' +
+        '<p><strong>你的路线：</strong>' + coachAnalysis.rawEngine.yourSequence + '</p>' +
+        (coachAnalysis.sameRoute ? '' : '<p><strong>首选路线：</strong>' + coachAnalysis.rawEngine.bestSequence + '</p>') +
+        routeButtons +
+        '<div class="candidate-list">' + candidateRowsHtml(coachAnalysis.candidates) + '</div>' +
+        '<p class="engine-detail-line">' + coachAnalysis.engineDetail + '</p>' +
+      '</div>' +
+    '</details>';
+}
+
+function render() {
+  renderBoard();
+  renderHistory();
+  renderStatus();
+  renderEvaluation();
+  renderCoach();
+  renderMoveHints();
+}
+
+function resetGame() {
+  board = createInitialBoard();
+  currentTurn = COLORS.RED;
+  selected = null;
+  legalTargets = [];
+  history = [];
+  snapshots = [cloneBoard(board)];
+  locked = false;
+  gameOver = false;
+  coachAnalysis = null;
+  engineEvaluationCp = null;
+  pausedAfterUndo = false;
+  clearMoveSuggestions();
+  lastMoveLabelElement.textContent = "请选择一个棋子开始";
+  render();
+  if (engineConnected) refreshMoveSuggestions();
+}
+
+function restoreAfterUndo(removeCount, forceRedTurn) {
+  history.splice(-removeCount, removeCount);
+  snapshots.splice(-removeCount, removeCount);
+  board = cloneBoard(snapshots.at(-1));
+  currentTurn = forceRedTurn ? COLORS.RED : (history.length % 2 === 0 ? COLORS.RED : COLORS.BLACK);
+  selected = null;
+  legalTargets = [];
+  locked = false;
+  gameOver = false;
+  coachAnalysis = null;
+  engineEvaluationCp = null;
+  lastMoveLabelElement.textContent = history.length ? "已回到 " + history.at(-1).notation + " 之后" : "请选择一个棋子开始";
+}
+
+function undoOneStep() {
+  if (!history.length || locked) return;
+  const removed = history.at(-1);
+  restoreAfterUndo(1, false);
+  currentTurn = removed.color;
+  pausedAfterUndo = removed.color === COLORS.BLACK;
+  if (pausedAfterUndo) lastMoveLabelElement.textContent = "已退回电脑走棋前。可继续让电脑重新选择。";
+  render();
+  if (!pausedAfterUndo && currentTurn === COLORS.RED) refreshMoveSuggestions();
+}
+
+function undoTurn() {
+  if (!history.length || locked) return;
+  const removeCount = history.at(-1)?.color === COLORS.BLACK && history.length >= 2 ? 2 : 1;
+  restoreAfterUndo(removeCount, true);
+  pausedAfterUndo = false;
+  render();
+  if (currentTurn === COLORS.RED) refreshMoveSuggestions();
+}
+
+async function resumeAfterUndo() {
+  if (!pausedAfterUndo || locked) return;
+  pausedAfterUndo = false;
+  if (currentTurn === COLORS.BLACK) {
+    locked = true;
+    render();
+    await performComputerMove();
+  } else {
+    render();
+  }
+}
+
+function previewBoardAt(route, index) {
+  let previewBoard = cloneBoard(coachAnalysis.sourceBoard);
+  for (let stepIndex = 0; stepIndex < index; stepIndex += 1) {
+    previewBoard = applyMove(previewBoard, route.steps[stepIndex].move).board;
+  }
+  return previewBoard;
+}
+
+function renderRoutePreview() {
+  const route = routePreviewState.route;
+  if (!route || !routePreviewBoardElement) return;
+  const previewBoard = previewBoardAt(route, routePreviewState.index);
+  const activeStep = routePreviewState.index > 0 ? route.steps[routePreviewState.index - 1] : null;
+  routePreviewBoardElement.innerHTML = "";
+  for (let row = 0; row < ROWS; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      const cell = document.createElement("div");
+      cell.className = "route-preview-cell";
+      if (activeStep && activeStep.move.toRow === row && activeStep.move.toCol === col) cell.classList.add("active-to");
+      if (activeStep && activeStep.move.fromRow === row && activeStep.move.fromCol === col) cell.classList.add("active-from");
+      const entry = previewBoard[row][col];
+      if (entry) {
+        const pieceElement = document.createElement("span");
+        pieceElement.className = "route-preview-piece " + entry.color;
+        pieceElement.textContent = entry.label;
+        cell.appendChild(pieceElement);
+      }
+      routePreviewBoardElement.appendChild(cell);
+    }
+  }
+  routePreviewTitleElement.textContent = routePreviewState.title;
+  routePreviewCounterElement.textContent = routePreviewState.index + " / " + route.steps.length;
+  routePreviewPrevElement.disabled = routePreviewState.index === 0;
+  routePreviewNextElement.disabled = routePreviewState.index >= route.steps.length;
+  routePreviewStepElement.textContent = activeStep ? activeStep.notation : "起始局面";
+  routePreviewEventElement.textContent = activeStep
+    ? (activeStep.events.length ? activeStep.events.join("、") : "这一手没有立即吃子或将军。")
+    : "使用前后按钮逐步查看棋盘上的真实变化。";
+}
+
+function openRoutePreview(routeKey) {
+  if (!coachAnalysis?.routes?.[routeKey]) return;
+  routePreviewState = {
+    route: coachAnalysis.routes[routeKey],
+    index: 0,
+    title: routeKey === "best" ? "Pikafish 首选路线" : "你的走法路线",
+  };
+  routePreviewModalElement.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+  renderRoutePreview();
+}
+
+function closeRoutePreview() {
+  routePreviewModalElement?.classList.add("hidden");
+  document.body.classList.remove("modal-open");
+}
+
+coachContentElement.addEventListener("click", (event) => {
+  const button = event.target.closest(".route-preview-trigger");
+  if (button) openRoutePreview(button.dataset.route);
+});
+routePreviewPrevElement?.addEventListener("click", () => {
+  routePreviewState.index = Math.max(0, routePreviewState.index - 1);
+  renderRoutePreview();
+});
+routePreviewNextElement?.addEventListener("click", () => {
+  routePreviewState.index = Math.min(routePreviewState.route.steps.length, routePreviewState.index + 1);
+  renderRoutePreview();
+});
+routePreviewCloseElement?.addEventListener("click", closeRoutePreview);
+routePreviewModalElement?.addEventListener("click", (event) => {
+  if (event.target === routePreviewModalElement) closeRoutePreview();
+});
+
+newGameButtonElement.addEventListener("click", resetGame);
+undoStepButtonElement.addEventListener("click", undoOneStep);
+undoButtonElement.addEventListener("click", undoTurn);
+resumeButtonElement.addEventListener("click", resumeAfterUndo);
+flipButtonElement.addEventListener("click", () => {
+  flipped = !flipped;
+  renderBoard();
+  renderMoveHints();
+});
+analysisToggleElement.addEventListener("change", renderCoach);
+function renderNotationLesson(notation = "车二进四", pieceType = "rook", color = "red") {
+  if (!notationBreakdownElement) return;
+  const chars = [...notation];
+  const pieceName = chars[0] || "";
+  const file = chars[1] || "";
+  const action = chars[2] || "";
+  const destination = chars[3] || "";
+  const fileText = (color === "red" ? "红方第" : "黑方第") + file + "路；从走棋一方右侧数";
+  const actionText = action === "进" ? "向对方方向移动" : action === "退" ? "向自己方向移动" : "横向移动";
+  const usesDestinationFile = action === "平" || ["horse", "elephant", "advisor"].includes(pieceType);
+  const destinationText = usesDestinationFile
+    ? "落到第" + destination + "路"
+    : "前进或后退" + destination + "个交叉点";
+  const items = [
+    [pieceName, "移动的棋子"],
+    [file, fileText],
+    [action, actionText],
+    [destination, destinationText],
+  ];
+  notationBreakdownElement.innerHTML = items.map(([token, text]) =>
+    '<div class="notation-token"><b>' + token + '</b><span>' + text + '</span></div>'
+  ).join('');
+}
+
+function openNotationLesson() {
+  notationModalElement?.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+  renderNotationLesson();
+  closeNotationButtonElement?.focus();
+}
+
+function closeNotationLesson() {
+  notationModalElement?.classList.add("hidden");
+  document.body.classList.remove("modal-open");
+  openNotationButtonElement?.focus();
+}
+
+openNotationButtonElement?.addEventListener("click", openNotationLesson);
+closeNotationButtonElement?.addEventListener("click", closeNotationLesson);
+notationModalElement?.querySelector("[data-close-notation]")?.addEventListener("click", closeNotationLesson);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !notationModalElement?.classList.contains("hidden")) closeNotationLesson();
+  if (event.key === "Escape" && !routePreviewModalElement?.classList.contains("hidden")) closeRoutePreview();
+});
+
+document.querySelectorAll(".notation-example").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".notation-example").forEach((item) => item.classList.remove("active"));
+    button.classList.add("active");
+    renderNotationLesson(button.dataset.notation, button.dataset.piece, button.dataset.color);
+  });
+});
+
+moveHintsToggleElement.addEventListener("change", () => {
+  if (moveHintsToggleElement.checked) refreshMoveSuggestions();
+  else clearMoveSuggestions();
+});
+levelSelectElement.addEventListener("change", () => {
+  if (currentTurn === COLORS.RED && !locked) refreshMoveSuggestions();
+});
+
+function switchPlatformView(viewName) {
+  const target = platformViews[viewName] ? viewName : "home";
+  const navTarget = target === "online" ? "play" : target;
+  Object.entries(platformViews).forEach(([name, element]) => element?.classList.toggle("hidden", name !== target));
+  document.querySelectorAll(".platform-nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === navTarget));
+  document.querySelector(".play-only-action")?.classList.toggle("hidden", target !== "play");
+  quickPlayButtonElement?.classList.toggle("hidden", target === "play" || target === "online");
+}
+
+window.XiangqiPlatform = { switchView: switchPlatformView };
+
+document.querySelectorAll(".platform-nav-item").forEach((item) => item.addEventListener("click", () => switchPlatformView(item.dataset.view)));
+document.querySelectorAll(".platform-jump").forEach((item) => item.addEventListener("click", () => switchPlatformView(item.dataset.targetView)));
+quickPlayButtonElement?.addEventListener("click", () => switchPlatformView("play"));
+learnNotationButtonElement?.addEventListener("click", openNotationLesson);
+
+document.querySelectorAll(".curriculum-start").forEach((button) => {
+  button.addEventListener("click", () => {
+    const level = button.dataset.level;
+    const names = { 16: "规则与走子", 15: "吃子、将军与一步意图", 14: "应将、保护与交换", 13: "两子配合与基础布局" };
+    const lessons = {
+      16: ["棋盘、九宫与河界", "七种棋子的走法", "吃子与将帅照面", "完成合法对局"],
+      15: ["子力价值", "将军与一步杀", "连续吃子", "一步棋的直接意图"],
+      14: ["正确应将", "躲、保、换", "保护强子", "判断交换"],
+      13: ["两子配合", "两步杀", "2–3步计算", "顺炮与列炮"],
+    };
+    curriculumDetailElement.innerHTML = '<div class="curriculum-detail-head"><div><span class="eyebrow">课程预览</span><h2>' + level + '级 · ' + names[level] + '</h2></div></div><div class="lesson-list">' + lessons[level].map((lesson, index) => '<div><span>' + (index + 1) + '</span><strong>' + lesson + '</strong><em>互动练习待接入</em></div>').join('') + '</div>';
+    curriculumDetailElement.classList.remove("hidden");
+  });
+});
+
+const initialPlatformView = window.location.hash.replace("#", "");
+switchPlatformView(platformViews[initialPlatformView] ? initialPlatformView : "home");
+
+render();
+renderNotationLesson();
+initializeEngine();

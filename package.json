@@ -1,0 +1,29 @@
+{
+  "name": "xiangqi-ai-coach",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "setup:engine": "node setup-pikafish.mjs",
+    "dev": "node start-local.mjs",
+    "dev:web": "vite",
+    "engine": "node engine-server.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node public-online-server.mjs",
+    "start:online": "node public-online-server.mjs",
+    "railway": "railway",
+    "clerk": "clerk"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.16.5",
+    "7zip-bin": "^5.2.0",
+    "pg": "^8.23.0",
+    "redis": "^6.2.1"
+  },
+  "devDependencies": {
+    "@railway/cli": "^5.41.0",
+    "clerk": "^3.1.0",
+    "vite": "^7.1.2"
+  }
+}

@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="棋理：在线中国象棋平台。下棋、训练、学习、复盘与棋力成长。" />
+    <title>棋理 · 在线中国象棋</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800;900&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/redesign.css" />
+    <link rel="stylesheet" href="/brand-v2.css" />
+    <link rel="stylesheet" href="/online.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">帅</div>
+          <div>
+            <strong>棋理</strong>
+            <span>中国象棋 · XIANGQI</span>
+          </div>
+        </div>
+        <nav class="platform-nav" aria-label="平台导航">
+          <button class="platform-nav-item active" data-view="home">首页</button>
+          <button class="platform-nav-item" data-view="play">下棋</button>
+          <button class="platform-nav-item" data-view="train">训练</button>
+          <button class="platform-nav-item" data-view="learn">学习</button>
+          <button class="platform-nav-item" data-view="review">复盘</button>
+          <button class="platform-nav-item" data-view="analysis">分析</button>
+          <button class="platform-nav-item" data-view="profile">我的</button>
+        </nav>
+        <div class="topbar-actions">
+          <button id="openNotationButton" class="button button-ghost">记谱教学</button>
+          <button id="quickPlayButton" class="button button-primary">开始下棋</button>
+          <button id="newGameButton" class="button button-secondary play-only-action hidden">重新开始</button>
+        </div>
+      </header>
+
+      <section id="homeView" class="platform-view home-view">
+        <div class="home-grid">
+          <section class="home-hero platform-surface">
+            <div><span class="eyebrow">XIANGQI · PLAY / REVIEW / IMPROVE</span><h1>每一盘，<br>都有下一步。</h1><p>下棋、复盘、找到弱点、针对训练。不是记住最佳着，而是真的知道下一步该练什么。</p><div class="hero-actions"><button class="button button-primary platform-jump" data-target-view="online">真人在线对弈</button><button class="button button-ghost platform-jump" data-target-view="play">与电脑下棋</button></div></div>
+            <div class="home-hero-board"><span>TODAY</span><strong>先下一盘。<br>剩下的交给复盘。</strong><p>有真实对局以后，训练才会真正属于你。</p><small>不展示虚构能力数据</small></div>
+          </section>
+          <section class="home-action-grid">
+            <article class="home-action-card"><b>棋</b><span class="eyebrow">立即开始</span><h2>下棋</h2><p>真人快速匹配和私人房间已经开放；也可以继续使用本地 Pikafish 人机对弈。</p><button class="button button-primary platform-jump" data-target-view="online">真人在线</button></article>
+            <article class="home-action-card"><b>题</b><span class="eyebrow">训练</span><h2>针对弱点练题</h2><p>未来从你的真实错着生成训练队列，不做随机刷题。</p><button class="button button-ghost platform-jump" data-target-view="train">训练规划</button></article>
+            <article class="home-action-card"><b>学</b><span class="eyebrow">课程</span><h2>分级学习</h2><p>从规则、吃子、将军、保护与交换，一步步学到基础布局。</p><button class="button button-ghost platform-jump" data-target-view="learn">学习路径</button></article>
+          </section>
+          <section class="home-lower-grid">
+            <article class="platform-surface home-status-card"><span class="eyebrow">你的成长</span><h2>能力画像</h2><p>吃子判断 · 将军识别 · 保护意识 · 交换判断</p><small>完成足够对局后才显示真实能力数据。</small></article>
+            <article class="platform-surface home-status-card"><span class="eyebrow">平台状态</span><h2>当前可用</h2><p>✓ 真人快速匹配<br>✓ 私人房间对弈<br>✓ 本地 Pikafish 人机对弈<br>○ 个性化题库</p></article>
+          </section>
+        </div>
+      </section>
+
+      <main id="playView" class="workspace platform-view hidden">
+        <aside class="panel left-panel">
+          <section>
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">对弈设置</span>
+                <h2>挑战电脑</h2>
+              </div>
+              <span id="gameStatusBadge" class="status-badge">红方走棋</span>
+            </div>
+
+            <label class="field-label" for="levelSelect">估算训练棋力</label>
+            <select id="levelSelect" class="select-control">
+              <option value="800">800 · 刚入门</option>
+              <option value="1000">1000 · 基础对弈</option>
+              <option value="1200" selected>1200 · 常见战术</option>
+              <option value="1400">1400 · 稳定业余</option>
+              <option value="1600">1600 · 较强业余</option>
+              <option value="1800">1800 · 高水平业余</option>
+              <option value="2000">2000 · 接近强手</option>
+              <option value="max">无限制 · Pikafish全力</option>
+            </select>
+            <p class="level-note">这是训练用估算等级，不等同于天天象棋或其他平台积分。</p>
+            <button id="openOnlinePlayButton" class="button button-primary action-wide online-entry-button">真人在线对弈</button>
+
+            <div class="analysis-toggle-row">
+              <div>
+                <strong>棋理分析</strong>
+                <span>只显示可验证证据</span>
+              </div>
+              <label class="switch">
+                <input id="analysisToggle" type="checkbox" checked />
+                <span class="switch-track"></span>
+              </label>
+            </div>
+
+            <div class="analysis-toggle-row hint-toggle-row">
+              <div>
+                <strong>显示候选着</strong>
+                <span>开启后在棋盘显示最佳、第二和第三候选</span>
+              </div>
+              <label class="switch">
+                <input id="moveHintsToggle" type="checkbox" />
+                <span class="switch-track"></span>
+              </label>
+            </div>
+          </section>
+
+          <section class="history-section">
+            <div class="section-heading compact">
+              <div>
+                <span class="eyebrow">本局记录</span>
+                <h2>着法列表</h2>
+              </div>
+              <span id="moveCount" class="muted-count">0 手</span>
+            </div>
+            <div id="moveHistory" class="move-history empty-state">
+              开始走棋后，这里会记录完整棋谱。
+            </div>
+          </section>
+
+          <div class="left-actions">
+            <button id="undoStepButton" class="button button-ghost" disabled>退回一步</button>
+            <button id="undoButton" class="button button-ghost" disabled>悔棋一回合</button>
+            <button id="resumeButton" class="button button-primary action-wide hidden">继续对弈</button>
+            <button id="flipButton" class="button button-ghost action-wide">翻转棋盘</button>
+          </div>
+        </aside>
+
+        <section class="board-column">
+          <div class="board-toolbar">
+            <div>
+              <span id="turnIndicator" class="turn-dot red"></span>
+              <strong id="turnText">轮到红方</strong>
+            </div>
+            <div id="evaluationDisplay" class="evaluation-pill">
+              <span>局势</span>
+              <strong>均势</strong>
+            </div>
+          </div>
+
+          <div id="board" class="xiangqi-board" aria-label="中国象棋棋盘">
+            <svg class="board-lines" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true">
+              <g class="grid-lines">
+                <line x1="0" y1="0" x2="800" y2="0" />
+                <line x1="0" y1="100" x2="800" y2="100" />
+                <line x1="0" y1="200" x2="800" y2="200" />
+                <line x1="0" y1="300" x2="800" y2="300" />
+                <line x1="0" y1="400" x2="800" y2="400" />
+                <line x1="0" y1="500" x2="800" y2="500" />
+                <line x1="0" y1="600" x2="800" y2="600" />
+                <line x1="0" y1="700" x2="800" y2="700" />
+                <line x1="0" y1="800" x2="800" y2="800" />
+                <line x1="0" y1="900" x2="800" y2="900" />
+                <line x1="0" y1="0" x2="0" y2="900" />
+                <line x1="100" y1="0" x2="100" y2="400" />
+                <line x1="100" y1="500" x2="100" y2="900" />
+                <line x1="200" y1="0" x2="200" y2="400" />
+                <line x1="200" y1="500" x2="200" y2="900" />
+                <line x1="300" y1="0" x2="300" y2="400" />
+                <line x1="300" y1="500" x2="300" y2="900" />
+                <line x1="400" y1="0" x2="400" y2="400" />
+                <line x1="400" y1="500" x2="400" y2="900" />
+                <line x1="500" y1="0" x2="500" y2="400" />
+                <line x1="500" y1="500" x2="500" y2="900" />
+                <line x1="600" y1="0" x2="600" y2="400" />
+                <line x1="600" y1="500" x2="600" y2="900" />
+                <line x1="700" y1="0" x2="700" y2="400" />
+                <line x1="700" y1="500" x2="700" y2="900" />
+                <line x1="800" y1="0" x2="800" y2="900" />
+                <line x1="300" y1="0" x2="500" y2="200" />
+                <line x1="500" y1="0" x2="300" y2="200" />
+                <line x1="300" y1="700" x2="500" y2="900" />
+                <line x1="500" y1="700" x2="300" y2="900" />
+              </g>
+              <text x="175" y="470" class="river-label">楚 河</text>
+              <text x="625" y="470" class="river-label">汉 界</text>
+            </svg>
+            <svg id="moveHints" class="move-hints" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <div id="boardPoints" class="board-points"></div>
+          </div>
+
+          <div class="board-footer">
+            <div class="move-hint-legend" id="moveHintLegend">
+              <span class="hint-best"><i></i>1 最佳</span>
+              <span class="hint-second"><i></i>2 第二</span>
+              <span class="hint-third"><i></i>3 第三</span>
+            </div>
+            <span id="lastMoveLabel">请选择一个棋子开始</span>
+          </div>
+        </section>
+
+        <aside class="panel coach-panel">
+          <div class="coach-header">
+            <div class="coach-avatar">AI</div>
+            <div>
+              <span class="eyebrow">实时分析</span>
+              <h2>棋理证据</h2>
+            </div>
+          </div>
+
+          <div id="coachContent" class="coach-content">
+            <article class="coach-card neutral">
+              <span class="card-kicker">确定性分析</span>
+              <h3>只展示可验证证据</h3>
+              <p>没有命中战术规则时，不会生成“为什么”的文字解释。</p>
+            </article>
+
+            <article class="coach-card principle">
+              <span class="card-kicker">本局训练重点</span>
+              <h3>先看强制手段</h3>
+              <p>每次走棋前，依次检查：将军、吃子、直接威胁，再考虑普通改善棋形的走法。</p>
+            </article>
+          </div>
+
+          <div class="engine-placeholder">
+            <div>
+              <span class="engine-dot"></span>
+              <strong>分析核心</strong>
+            </div>
+            <span id="engineState">正在连接 Pikafish…</span>
+          </div>
+        </aside>
+      </main>
+
+
+      <section id="onlineView" class="platform-view platform-page online-page hidden">
+        <div class="platform-page-header online-page-header">
+          <div>
+            <span class="eyebrow">LIVE · 真人在线</span>
+            <h1>和真人下一盘</h1>
+            <p>快速匹配，或者把房间码发给朋友。每一步都由服务器重新验证。</p>
+          </div>
+          <button id="onlineBackToComputer" class="button button-ghost">返回人机对弈</button>
+        </div>
+
+        <section id="onlineLobby" class="online-lobby">
+          <div class="platform-surface online-lobby-card online-lobby-main">
+            <span class="eyebrow">开始对局</span>
+            <h2>真人对弈</h2>
+            <label class="online-field">
+              <span>你的名字</span>
+              <input id="onlineDisplayName" type="text" maxlength="24" value="棋手" autocomplete="nickname" />
+            </label>
+            <label class="online-field">
+              <span>时间制</span>
+              <select id="onlineTimeControl">
+                <option value="600+0">10 + 0 · 快棋</option>
+                <option value="600+5">10 + 5 · 加秒</option>
+                <option value="300+3">5 + 3 · 快速</option>
+              </select>
+            </label>
+            <div class="online-primary-actions">
+              <button id="onlineQuickMatch" class="button button-primary">快速匹配</button>
+              <button id="onlineCancelMatch" class="button button-ghost">取消匹配</button>
+            </div>
+            <p id="onlineStatus" class="online-status">选择一种方式开始。</p>
+          </div>
+
+          <div class="online-lobby-side">
+            <article class="platform-surface online-lobby-card">
+              <span class="eyebrow">私人房间</span>
+              <h3>创建房间</h3>
+              <p>创建后会得到一个房间码，对方输入即可加入。</p>
+              <button id="onlineCreateRoom" class="button button-ghost action-wide">创建房间</button>
+            </article>
+            <article class="platform-surface online-lobby-card">
+              <span class="eyebrow">加入房间</span>
+              <h3>输入房间码</h3>
+              <div class="online-room-join">
+                <input id="onlineRoomCode" type="text" maxlength="10" placeholder="例如 A1B2C3D4E5" />
+                <button id="onlineJoinRoom" class="button button-secondary">加入</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="onlineGame" class="online-game hidden">
+          <div class="online-game-layout">
+            <aside class="platform-surface online-player-column">
+              <div class="online-player-card black">
+                <div class="online-player-token">将</div>
+                <div><span>黑方</span><strong id="onlineBlackName">等待对手</strong></div>
+                <b id="onlineBlackClock" class="online-clock">10:00</b>
+              </div>
+              <div class="online-room-meta">
+                <span>房间</span>
+                <strong id="onlineRoomCodeDisplay">—</strong>
+                <button id="onlineCopyRoomCode" class="button button-ghost">复制房间码</button>
+              </div>
+              <div class="online-player-card red">
+                <div class="online-player-token">帅</div>
+                <div><span>红方</span><strong id="onlineRedName">红方</strong></div>
+                <b id="onlineRedClock" class="online-clock">10:00</b>
+              </div>
+            </aside>
+
+            <section class="platform-surface online-board-column">
+              <div id="onlineGameState" class="online-game-state">等待对局开始</div>
+              <div class="online-xiangqi-board" aria-label="真人中国象棋棋盘">
+                <div class="online-board-river"><span>楚 河</span><span>汉 界</span></div>
+                <div id="onlineBoardPoints"></div>
+              </div>
+              <div class="online-game-actions">
+                <button id="onlineOfferDraw" class="button button-ghost">求和</button>
+                <button id="onlineResign" class="button button-ghost">认输</button>
+                <button id="onlineReturnLobby" class="button button-secondary">返回大厅</button>
+              </div>
+              <div id="onlineDrawOffer" class="online-draw-offer hidden">
+                <strong>对手请求和棋</strong>
+                <div>
+                  <button id="onlineAcceptDraw" class="button button-primary">同意</button>
+                  <button id="onlineDeclineDraw" class="button button-ghost">拒绝</button>
+                </div>
+              </div>
+            </section>
+
+            <aside class="platform-surface online-side-panel">
+              <span class="eyebrow">对局记录</span>
+              <h2>着法</h2>
+              <div id="onlineMoveList" class="online-move-list">
+                <div class="online-empty">还没有走子</div>
+              </div>
+              <div class="online-server-note">
+                <strong>服务器裁判</strong>
+                <p>走子、轮次和时钟由服务器决定。刷新页面会自动尝试回到本局。</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </section>
+
+      <section id="trainView" class="platform-view platform-page hidden">
+        <div class="platform-page-header"><div><span class="eyebrow">TRAIN · 针对训练</span><h1>把错过的棋，再练会一次</h1><p>以后每次复盘都会把真实错误归类到对应训练模块。</p></div><span>训练系统建设中</span></div>
+        <div class="training-layout">
+          <aside class="platform-surface training-menu">
+            <span class="eyebrow">训练类型</span>
+            <button class="training-menu-item active"><b>今</b><span>今日训练<small>根据最近对局</small></span></button>
+            <button class="training-menu-item"><b>将</b><span>将军与应将<small>强制手优先</small></span></button>
+            <button class="training-menu-item"><b>保</b><span>保护与交换<small>避免无谓丢子</small></span></button>
+            <button class="training-menu-item"><b>杀</b><span>基础杀法<small>一步杀、两步杀</small></span></button>
+            <button class="training-menu-item"><b>局</b><span>基础布局<small>顺炮、列炮</small></span></button>
+          </aside>
+          <section class="platform-surface training-main">
+            <div class="training-head"><div><span class="eyebrow">示例训练模块</span><h2>保护与交换</h2><p>目标：先看清哪些强子正在受攻，再判断躲、保、换哪个更合适。</p></div><span class="training-badge">14级能力</span></div>
+            <div class="puzzle-preview-row">
+              <article class="puzzle-preview"><span>题目 1</span><div class="mini-board"><i>车</i><i>炮</i></div><small>找出受攻强子</small></article>
+              <article class="puzzle-preview"><span>题目 2</span><div class="mini-board"><i>马</i><i>车</i></div><small>选择躲、保或换</small></article>
+              <article class="puzzle-preview"><span>题目 3</span><div class="mini-board"><i>炮</i><i>卒</i></div><small>判断交换是否划算</small></article>
+              <article class="puzzle-preview"><span>题目 4</span><div class="mini-board"><i>车</i><i>马</i></div><small>检查对手反吃</small></article>
+            </div>
+            <div class="training-footer"><p>完成真实复盘后，这里会优先出现你重复犯错的题型。</p><button class="button button-primary" disabled>训练功能即将接入</button></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="learnView" class="platform-view platform-page hidden"><div class="platform-page-header"><div><span class="eyebrow">LEARN</span><h1>学习中国象棋</h1><p>按照初学者真正需要掌握的顺序学习。</p></div><button class="button button-ghost" id="learnNotationButton">先学记谱</button></div><div class="curriculum-grid"><article class="curriculum-card platform-surface"><b>16</b><h2>规则与走子</h2><p>棋盘、九宫、河界、棋子走法、吃子和将帅照面。</p><button class="button button-primary curriculum-start" data-level="16">查看课程</button></article><article class="curriculum-card platform-surface"><b>15</b><h2>吃子、将军与一步意图</h2><p>子力价值、将军、一步杀、连续吃子。</p><button class="button button-ghost curriculum-start" data-level="15">查看课程</button></article><article class="curriculum-card platform-surface"><b>14</b><h2>应将、保护与交换</h2><p>躲、保、换，避免强子损失。</p><button class="button button-ghost curriculum-start" data-level="14">查看课程</button></article><article class="curriculum-card platform-surface"><b>13</b><h2>两子配合与基础布局</h2><p>两子配合、2–3步计算、顺炮和列炮。</p><button class="button button-ghost curriculum-start" data-level="13">查看课程</button></article></div><div id="curriculumDetail" class="platform-surface curriculum-detail hidden"></div></section>
+
+      <section id="reviewDropzone" class="review-dropzone platform-view hidden">
+        <div class="drop-icon">谱</div>
+        <h2>导入一盘棋进行复盘</h2>
+        <p>第一阶段将支持粘贴中国象棋 PGN、手动摆盘和上传棋谱文件。</p>
+        <button class="button button-primary" disabled>即将开放</button>
+      </section>
+      <section id="analysisView" class="platform-view platform-page hidden">
+        <div class="platform-page-header"><div><span class="eyebrow">ANALYSIS · 棋盘分析</span><h1>把任何局面放上来研究</h1><p>自由摆盘、FEN、候选着与 Pikafish 主变化会集中在这里。</p></div><span>下一阶段</span></div>
+        <div class="analysis-layout">
+          <section class="platform-surface analysis-board-shell"><div class="analysis-placeholder-board"><span>车</span><span>马</span><span>炮</span><span class="red-chip">帅</span></div><p>自由摆盘棋盘</p></section>
+          <aside class="platform-surface analysis-side"><span class="eyebrow">分析工具</span><h2>Pikafish</h2><div class="analysis-option"><span>局面来源</span><strong>手动摆盘 / FEN</strong></div><div class="analysis-option"><span>候选路线</span><strong>MultiPV 1–5</strong></div><div class="analysis-option"><span>教学解释</span><strong>可验证证据 + AI</strong></div><button class="button button-primary" disabled>自由分析即将开放</button></aside>
+        </div>
+      </section>
+      <section id="profileView" class="platform-view platform-page hidden">
+        <div class="platform-page-header"><div><span class="eyebrow">PROFILE · 我的</span><h1>你的棋手档案</h1><p>游客可以直接下棋；登录后，历史棋局与 Rapid / Blitz Rating 可以在其他设备恢复。</p></div><span id="profileAccountStatus">正在建立棋手身份…</span></div>
+        <div class="profile-grid">
+          <article class="platform-surface profile-identity">
+            <div class="profile-avatar">帅</div>
+            <div class="profile-identity-copy"><span class="eyebrow">棋手档案</span><h2 id="profileDisplayName">棋手</h2><p id="profileIdentityNote">游客身份只保存在当前浏览器。登录时会把当前历史棋局和 Rating 原地认领到正式账户。</p></div>
+            <div class="profile-name-editor">
+              <input id="profileNameInput" type="text" maxlength="24" value="棋手" autocomplete="nickname" aria-label="棋手昵称" />
+              <button id="profileSaveName" class="button button-ghost">保存昵称</button>
+              <small id="profileNameStatus"></small>
+            </div>
+            <div class="profile-auth-actions">
+              <div>
+                <button id="profileSignIn" class="button button-primary hidden">登录 / 注册</button>
+                <button id="profileAddPasskey" class="button button-ghost hidden">添加 Passkey</button>
+                <button id="profileSignOut" class="button button-ghost hidden">退出登录</button>
+              </div>
+              <small id="profileAuthStatus">正在检查登录服务…</small>
+            </div>
+          </article>
+          <article class="platform-surface profile-stat rating-stat"><span>Rapid</span><strong id="profileRapidRating">1200</strong><small id="profileRapidMeta">初始 1200 · 尚无定级对局</small></article>
+          <article class="platform-surface profile-stat rating-stat"><span>Blitz</span><strong id="profileBlitzRating">1200</strong><small id="profileBlitzMeta">初始 1200 · 尚无定级对局</small></article>
+          <article class="platform-surface profile-stat"><span>完成真人对局</span><strong id="profileGameCount">0</strong><small>来自永久棋谱数据库</small></article>
+          <article class="platform-surface ability-card"><div><span class="eyebrow">能力画像</span><h2>不是一个总分，而是六项能力</h2></div><div class="ability-empty"><span>将军识别</span><span>吃子判断</span><span>保护意识</span><span>交换判断</span><span>杀法计算</span><span>布局基础</span></div><p>有足够真实对局后才显示能力百分比，不使用虚构数据。</p></article>
+          <article class="platform-surface recent-games-card profile-history-card">
+            <div class="profile-history-head"><div><span class="eyebrow">最近对局</span><h2>真人历史棋局</h2></div><button class="button button-ghost platform-jump" data-target-view="online">再下一盘</button></div>
+            <div id="profileRecentGames" class="profile-history-list"><div class="profile-history-empty"><strong>正在读取历史棋局…</strong></div></div>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <div id="notationModal" class="notation-modal hidden" role="dialog" aria-modal="true" aria-labelledby="notationModalTitle">
+      <button class="notation-backdrop" data-close-notation aria-label="关闭记谱教学"></button>
+      <section class="notation-dialog">
+        <header class="notation-dialog-header">
+          <div>
+            <span class="eyebrow">基础教学</span>
+            <h2 id="notationModalTitle">象棋记谱怎么读</h2>
+          </div>
+          <button id="closeNotationButton" class="notation-close" aria-label="关闭">×</button>
+        </header>
+
+        <p class="notation-intro">一手棋通常由四部分组成：棋子、起始纵线、移动方向、移动距离或目标纵线。</p>
+        <div class="notation-examples" role="group" aria-label="记谱示例">
+          <button class="notation-example active" data-notation="车二进四" data-piece="rook" data-color="red">车二进四</button>
+          <button class="notation-example" data-notation="马八进七" data-piece="horse" data-color="red">马八进七</button>
+          <button class="notation-example" data-notation="炮2平5" data-piece="cannon" data-color="black">炮2平5</button>
+        </div>
+        <div id="notationBreakdown" class="notation-breakdown" aria-live="polite"></div>
+        <div class="notation-help-grid">
+          <article>
+            <strong>进、退、平</strong>
+            <p>进：向对方方向走；退：向自己方向走；平：保持同一横线左右移动。</p>
+          </article>
+          <article>
+            <strong>最后一个数字</strong>
+            <p>车、炮、兵通常表示移动几格；马、相、仕以及“平”通常表示落到哪一路。</p>
+          </article>
+          <article>
+            <strong>纵线从哪里数</strong>
+            <p>红方和黑方都从自己右手边开始数。红方常用中文数字，黑方常用阿拉伯数字。</p>
+          </article>
+        </div>
+        <p class="notation-rule">例：车二进四 = 第二路的车，向前走四个交叉点。</p>
+      </section>
+    </div>
+
+    <div id="routePreviewModal" class="route-preview-modal hidden" role="dialog" aria-modal="true" aria-labelledby="routePreviewTitle">
+      <div class="route-preview-dialog">
+        <div class="route-preview-header">
+          <div>
+            <span class="eyebrow">棋盘验证</span>
+            <h2 id="routePreviewTitle">查看引擎路线</h2>
+          </div>
+          <button id="routePreviewClose" class="modal-close" aria-label="关闭路线预览">×</button>
+        </div>
+        <div id="routePreviewBoard" class="route-preview-board" aria-label="路线预览棋盘"></div>
+        <div class="route-preview-info">
+          <strong id="routePreviewStep">起始局面</strong>
+          <span id="routePreviewEvent">使用前后按钮逐步查看真实棋盘变化。</span>
+        </div>
+        <div class="route-preview-actions">
+          <button id="routePreviewPrev" class="button button-ghost">上一步</button>
+          <span id="routePreviewCounter">0 / 0</span>
+          <button id="routePreviewNext" class="button button-primary">下一步</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/engine-client.js"></script>
+    <script type="module" src="/coach-tools.js"></script>
+    <script type="module" src="/app.js"></script>
+    <script type="module" src="/auth-client.js"></script>
+    <script type="module" src="/identity-client.js"></script>
+    <script type="module" src="/online-client.js"></script>
+  </body>
+</html>

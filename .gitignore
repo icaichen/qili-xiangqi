@@ -1,0 +1,9 @@
+node_modules/
+dist/
+engine/*.zip
+engine/pikafish*
+engine/**/*.zip
+.env.local
+.env.*.local
+.rating-test-state.json
+.DS_Store

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: qili-xiangqi
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:online
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
