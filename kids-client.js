@@ -1,0 +1,413 @@
+const rules = window.QiliTutorialRules;
+
+if (!rules) {
+  console.warn("Qili Kids: tutorial rules unavailable");
+} else {
+  const { ROWS, COLS, COLORS, createEmptyBoard, piece, generatePseudoMoves, applyMove } = rules;
+
+  const styleLink = document.createElement("link");
+  styleLink.rel = "stylesheet";
+  styleLink.href = "/kids.css";
+  styleLink.dataset.qiliKidsStyle = "1";
+  if (!document.querySelector('[data-qili-kids-style="1"]')) document.head.appendChild(styleLink);
+
+  const appShell = document.querySelector(".app-shell");
+  const homeView = document.querySelector("#homeView");
+  const topbarActions = document.querySelector(".topbar-actions");
+
+  const entryButton = document.createElement("button");
+  entryButton.id = "openKidsMode";
+  entryButton.className = "button button-ghost kids-mode-entry";
+  entryButton.textContent = "儿童模式";
+  topbarActions?.prepend(entryButton);
+
+  const kidsView = document.createElement("section");
+  kidsView.id = "kidsView";
+  kidsView.className = "platform-view kids-view hidden";
+  homeView?.insertAdjacentElement("afterend", kidsView);
+
+  const LESSONS = [
+    {
+      icon: "宫",
+      title: "找到帅的小城堡",
+      subtitle: "认识九宫",
+      prompt: "帅住在自己的小城堡里。你能在棋盘上点到红方九宫吗？",
+      tip: "红方九宫就在棋盘最下面中央的 3 × 3 交叉点区域。",
+      mode: "zone",
+      zone: (row, col) => row >= 7 && row <= 9 && col >= 3 && col <= 5,
+      success: "找到了！帅不能跑出这座小城堡。",
+      pieces: [[9, 4, "general", COLORS.RED]],
+    },
+    {
+      icon: "车",
+      title: "让车冲上去",
+      subtitle: "车走直线",
+      prompt: "车最喜欢直线冲刺。点红车，再把它送到上面的星星位置。",
+      tip: "车可以横着或直着走，只要路上没人挡住。",
+      mode: "move",
+      pieces: [[8, 4, "rook", COLORS.RED]],
+      expected: [8, 4, 3, 4],
+      success: "漂亮！车沿直线一路冲到了目标。",
+    },
+    {
+      icon: "马",
+      title: "谁绊住了小马？",
+      subtitle: "认识蹩马腿",
+      prompt: "小马想往左上跳，可它被绊住了。点出真正挡住它的棋子。",
+      tip: "马虽然会走“日”，但紧挨着它的马腿位置不能被堵住。",
+      mode: "identify",
+      pieces: [[7, 4, "horse", COLORS.RED], [6, 4, "pawn", COLORS.RED]],
+      identify: [6, 4],
+      success: "对，就是它！马腿被堵住，对应方向就跳不过去。",
+    },
+    {
+      icon: "炮",
+      title: "给炮搭一座桥",
+      subtitle: "炮架",
+      prompt: "红炮想吃掉黑车。中间刚好有一个棋子当炮架。试试看！",
+      tip: "炮平时像车一样走；吃子时，中间必须刚好隔一个棋子。",
+      mode: "move",
+      pieces: [[7, 4, "cannon", COLORS.RED], [5, 4, "pawn", COLORS.RED], [2, 4, "rook", COLORS.BLACK]],
+      expected: [7, 4, 2, 4],
+      success: "命中！隔着一个炮架，炮才能跳过去吃子。",
+    },
+    {
+      icon: "兵",
+      title: "小兵过河啦",
+      subtitle: "兵的变化",
+      prompt: "这枚兵已经过河了。让它向左走一步。",
+      tip: "兵没过河时只能向前；过河后可以向前、向左、向右，但永远不能后退。",
+      mode: "move",
+      pieces: [[4, 4, "pawn", COLORS.RED]],
+      expected: [4, 4, 4, 3],
+      success: "做对了！过河以后，小兵会多出左右两个方向。",
+    },
+    {
+      icon: "吃",
+      title: "第一次吃子",
+      subtitle: "占领对方位置",
+      prompt: "黑卒挡在前面。用红车把它吃掉。",
+      tip: "吃子就是走到对方棋子所在的位置，并把那枚棋子拿走。",
+      mode: "move",
+      pieces: [[7, 2, "rook", COLORS.RED], [3, 2, "pawn", COLORS.BLACK]],
+      expected: [7, 2, 3, 2],
+      success: "吃到了！你的棋子会占据对方原来的位置。",
+    },
+    {
+      icon: "将",
+      title: "大声喊：将军！",
+      subtitle: "认识将军",
+      prompt: "把红车走到星星位置，让黑将立刻受到攻击。",
+      tip: "当你的棋子下一步可以直接吃掉对方的将或帅，这就叫“将军”。",
+      mode: "move",
+      pieces: [[5, 0, "rook", COLORS.RED], [0, 4, "general", COLORS.BLACK]],
+      expected: [5, 0, 5, 4],
+      success: "将军！黑将现在必须马上想办法逃开或挡住攻击。",
+    },
+    {
+      icon: "救",
+      title: "快救救自己的帅",
+      subtitle: "被将军必须应对",
+      prompt: "黑车正在攻击红帅。把红帅移到安全的位置。",
+      tip: "自己的帅被将军时，不能假装没看到。必须立刻躲开、挡住或吃掉威胁。",
+      mode: "move",
+      pieces: [[9, 4, "general", COLORS.RED], [5, 4, "rook", COLORS.BLACK]],
+      expected: [9, 4, 9, 3],
+      success: "安全了！被将军时，第一件事永远是先救自己的帅。",
+      finale: true,
+    },
+  ];
+
+  let completed = Math.max(0, Math.min(LESSONS.length, Number(localStorage.getItem("qili-kids-ch1-completed") || 0)));
+  let screen = "map";
+  let lessonIndex = Math.min(completed, LESSONS.length - 1);
+  let board = createEmptyBoard();
+  let selected = null;
+  let legalTargets = [];
+  let lessonDone = false;
+  let feedback = null;
+
+  function makeBoard(lesson) {
+    const next = createEmptyBoard();
+    (lesson.pieces || []).forEach(([row, col, type, color]) => {
+      next[row][col] = piece(type, color);
+    });
+    return next;
+  }
+
+  function saveProgress() {
+    localStorage.setItem("qili-kids-ch1-completed", String(completed));
+  }
+
+  function starsText() {
+    return `${completed} / ${LESSONS.length}`;
+  }
+
+  function openKids() {
+    document.body.classList.add("kids-mode");
+    document.querySelectorAll(".platform-view").forEach((view) => view.classList.add("hidden"));
+    kidsView.classList.remove("hidden");
+    if (window.location.hash !== "#kids") history.replaceState(null, "", "#kids");
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function closeKids() {
+    document.body.classList.remove("kids-mode");
+    kidsView.classList.add("hidden");
+    window.XiangqiPlatform?.switchView?.("home");
+    history.replaceState(null, "", "#home");
+  }
+
+  function startLesson(index) {
+    if (index > completed) return;
+    screen = "lesson";
+    lessonIndex = Math.max(0, Math.min(LESSONS.length - 1, index));
+    board = makeBoard(LESSONS[lessonIndex]);
+    selected = null;
+    legalTargets = [];
+    lessonDone = false;
+    feedback = null;
+    render();
+  }
+
+  function markLessonComplete() {
+    lessonDone = true;
+    selected = null;
+    legalTargets = [];
+    if (lessonIndex === completed && completed < LESSONS.length) {
+      completed += 1;
+      saveProgress();
+    }
+    feedback = { kind: "success", title: "太棒了！", text: LESSONS[lessonIndex].success };
+    render();
+  }
+
+  function fail(title, text) {
+    feedback = { kind: "error", title, text };
+    render();
+  }
+
+  function renderShell(inner) {
+    kidsView.innerHTML = `
+      <div class="kids-shell">
+        <header class="kids-topbar">
+          <button class="kids-brand" data-kids-home aria-label="回到儿童模式首页">
+            <span class="kids-brand-piece">帅</span>
+            <span><strong>棋理 Kids</strong><small>快乐学中国象棋</small></span>
+          </button>
+          <div class="kids-top-stats">
+            <span class="kids-star-pill">★ <strong>${starsText()}</strong></span>
+            <button class="kids-adult-exit" data-exit-kids>返回普通模式</button>
+          </div>
+        </header>
+        ${inner}
+      </div>`;
+
+    kidsView.querySelector("[data-exit-kids]")?.addEventListener("click", closeKids);
+    kidsView.querySelector("[data-kids-home]")?.addEventListener("click", () => {
+      screen = "map";
+      render();
+    });
+  }
+
+  function renderMap() {
+    const nextIndex = Math.min(completed, LESSONS.length - 1);
+    const chapterComplete = completed >= LESSONS.length;
+    const nodes = LESSONS.map((lesson, index) => {
+      const done = index < completed;
+      const current = !chapterComplete && index === completed;
+      const locked = index > completed;
+      const stateClass = done ? "done" : current ? "current" : locked ? "locked" : "";
+      const badge = done ? "✓" : locked ? "锁" : lesson.icon;
+      return `
+        <button class="kids-path-node ${stateClass}" data-kids-lesson="${index}" ${locked ? "disabled" : ""}>
+          <span class="kids-node-bubble">${badge}</span>
+          <span class="kids-node-copy"><strong>${lesson.title}</strong><small>${lesson.subtitle}</small></span>
+          ${current ? '<span class="kids-current-tag">从这里开始</span>' : ""}
+        </button>`;
+    }).join("");
+
+    renderShell(`
+      <main class="kids-map-page">
+        <section class="kids-hero-card">
+          <div class="kids-hero-copy">
+            <span class="kids-eyebrow">第一章 · 第一次走进象棋世界</span>
+            <h1>${chapterComplete ? "第一章完成！" : "一起认识棋盘上的新朋友"}</h1>
+            <p>${chapterComplete ? "你已经会走第一批棋子，也知道什么是将军了。" : "每次只学一个小规则。点棋盘、走一步、马上知道自己为什么做对。"}</p>
+            <button class="kids-primary-action" data-kids-resume>${chapterComplete ? "重新挑战第一章" : completed ? "继续学习" : "开始第一关"}</button>
+          </div>
+          <div class="kids-mascot-card" aria-label="棋理儿童陪练角色">
+            <div class="kids-mascot-speech">${chapterComplete ? "八颗星都集齐啦！" : "我叫棋仔，今天陪你走第一步。"}</div>
+            <div class="kids-mascot">
+              <span class="kids-mascot-eye left"></span><span class="kids-mascot-eye right"></span><span class="kids-mascot-smile"></span><strong>车</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="kids-chapter-card">
+          <div class="kids-chapter-head">
+            <div><span>CHAPTER 1</span><h2>第一次走进象棋世界</h2><p>完成一关，就拿到一颗真实的学习星星。</p></div>
+            <div class="kids-chapter-progress"><strong>${completed}</strong><span>/ ${LESSONS.length} 颗星</span></div>
+          </div>
+          <div class="kids-progress-track"><i style="width:${(completed / LESSONS.length) * 100}%"></i></div>
+          <div class="kids-path">${nodes}</div>
+        </section>
+
+        <section class="kids-coming-soon">
+          <div class="kids-coming-icon">⚡</div>
+          <div><span>下一章</span><h3>学会吃子和保护自己</h3><p>等第一章体验确认后，我们再继续设计，而不是一次塞进很多课。</p></div>
+          <span class="kids-lock-pill">尚未开放</span>
+        </section>
+      </main>`);
+
+    kidsView.querySelector("[data-kids-resume]")?.addEventListener("click", () => startLesson(chapterComplete ? 0 : nextIndex));
+    kidsView.querySelectorAll("[data-kids-lesson]").forEach((button) => {
+      button.addEventListener("click", () => startLesson(Number(button.dataset.kidsLesson)));
+    });
+  }
+
+  function positionPercent(row, col) {
+    const inset = 6;
+    const span = 88;
+    return { left: `${inset + (col / (COLS - 1)) * span}%`, top: `${inset + (row / (ROWS - 1)) * span}%` };
+  }
+
+  function isLegalTarget(row, col) {
+    return legalTargets.some((move) => move.toRow === row && move.toCol === col);
+  }
+
+  function renderBoard() {
+    const lesson = LESSONS[lessonIndex];
+    const points = [];
+    for (let row = 0; row < ROWS; row += 1) {
+      for (let col = 0; col < COLS; col += 1) {
+        const entry = board[row][col];
+        const pos = positionPercent(row, col);
+        const selectedClass = selected?.row === row && selected?.col === col ? " selected" : "";
+        const targetClass = isLegalTarget(row, col) ? (entry ? " capture" : " legal") : "";
+        const expected = lesson.expected;
+        const goalClass = expected && row === expected[2] && col === expected[3] && !lessonDone ? " goal" : "";
+        points.push(`
+          <button class="kids-board-point${selectedClass}${targetClass}${goalClass}" data-board-row="${row}" data-board-col="${col}" style="left:${pos.left};top:${pos.top}">
+            ${entry ? `<span class="kids-piece ${entry.color}">${entry.label}</span>` : ""}
+          </button>`);
+      }
+    }
+    return `
+      <div class="kids-board" aria-label="儿童互动象棋棋盘">
+        <div class="kids-board-grid"></div>
+        <div class="kids-river"><span>楚 河</span><span>汉 界</span></div>
+        ${points.join("")}
+      </div>`;
+  }
+
+  function renderLesson() {
+    const lesson = LESSONS[lessonIndex];
+    const message = feedback || { kind: "neutral", title: "轮到你啦", text: lesson.prompt };
+    renderShell(`
+      <main class="kids-lesson-page">
+        <button class="kids-back-map" data-back-map>← 回到学习地图</button>
+        <div class="kids-lesson-progress-row">
+          <span>第 ${lessonIndex + 1} 关</span>
+          <div class="kids-progress-track"><i style="width:${((lessonIndex + (lessonDone ? 1 : 0)) / LESSONS.length) * 100}%"></i></div>
+          <strong>${lessonIndex + 1} / ${LESSONS.length}</strong>
+        </div>
+
+        <section class="kids-lesson-layout">
+          <div class="kids-lesson-main">
+            <div class="kids-lesson-title"><span class="kids-lesson-icon">${lesson.icon}</span><div><small>${lesson.subtitle}</small><h1>${lesson.title}</h1><p>${lesson.prompt}</p></div></div>
+            ${renderBoard()}
+            <div class="kids-feedback ${message.kind}"><span class="kids-feedback-face">${message.kind === "success" ? "★" : message.kind === "error" ? "!" : "?"}</span><div><strong>${message.title}</strong><p>${message.text}</p></div></div>
+          </div>
+
+          <aside class="kids-coach-card">
+            <div class="kids-mini-mascot"><strong>车</strong></div>
+            <span>棋仔的小提示</span>
+            <h2>${lesson.tip}</h2>
+            <p>不用背一大段。先在棋盘上做一次，做对以后再记住这个规则。</p>
+            ${lessonDone ? `<button class="kids-primary-action" data-next-kids>${lesson.finale ? "回到地图看看星星" : "下一关"}</button>` : ""}
+            <button class="kids-secondary-action" data-reset-kids>重新试一次</button>
+          </aside>
+        </section>
+      </main>`);
+
+    kidsView.querySelector("[data-back-map]")?.addEventListener("click", () => { screen = "map"; render(); });
+    kidsView.querySelector("[data-reset-kids]")?.addEventListener("click", () => startLesson(lessonIndex));
+    kidsView.querySelector("[data-next-kids]")?.addEventListener("click", () => {
+      if (lessonIndex >= LESSONS.length - 1) {
+        screen = "map";
+        render();
+      } else {
+        startLesson(lessonIndex + 1);
+      }
+    });
+    kidsView.querySelectorAll("[data-board-row]").forEach((button) => {
+      button.addEventListener("click", () => handleBoardClick(Number(button.dataset.boardRow), Number(button.dataset.boardCol)));
+    });
+  }
+
+  function handleBoardClick(row, col) {
+    if (lessonDone) return;
+    const lesson = LESSONS[lessonIndex];
+
+    if (lesson.mode === "zone") {
+      if (lesson.zone?.(row, col)) markLessonComplete();
+      else fail("再找找", "帅的小城堡在红方底线中央，不在棋盘边上。" );
+      return;
+    }
+
+    if (lesson.mode === "identify") {
+      if (row === lesson.identify?.[0] && col === lesson.identify?.[1]) markLessonComplete();
+      else fail("不是它", "看看谁紧挨着小马，而且正好挡住了它要跳的方向。" );
+      return;
+    }
+
+    const expected = lesson.expected;
+    if (!expected) return;
+
+    if (!selected) {
+      if (row !== expected[0] || col !== expected[1]) {
+        fail("先找到要动的棋子", "题目里已经告诉你今天要帮助哪一枚红棋。" );
+        return;
+      }
+      selected = { row, col };
+      legalTargets = generatePseudoMoves(board, row, col);
+      feedback = { kind: "neutral", title: "选中了！", text: "现在把它走到星星目标位置。亮起来的点都是这枚棋子按基础规则能到的位置。" };
+      render();
+      return;
+    }
+
+    if (row === selected.row && col === selected.col) {
+      selected = null;
+      legalTargets = [];
+      feedback = null;
+      render();
+      return;
+    }
+
+    if (row !== expected[2] || col !== expected[3]) {
+      if (isLegalTarget(row, col)) fail("这步能走，但不是今天的小任务", "看看闪着星星的目标点，再试一次。" );
+      else fail("这里走不到", "这个位置不符合刚才学到的规则。看看棋仔的提示。" );
+      return;
+    }
+
+    const move = legalTargets.find((candidate) => candidate.toRow === row && candidate.toCol === col);
+    if (!move) {
+      fail("差一点", "目标虽然对，但当前棋子的走法还不允许到这里。" );
+      return;
+    }
+
+    board = applyMove(board, move).board;
+    markLessonComplete();
+  }
+
+  function render() {
+    if (screen === "lesson") renderLesson();
+    else renderMap();
+  }
+
+  entryButton.addEventListener("click", openKids);
+
+  if (window.location.hash === "#kids") openKids();
+}
