@@ -8,7 +8,7 @@
     "dev": "node start-local.mjs",
     "dev:web": "vite",
     "engine": "node engine-server.mjs",
-    "build": "vite build",
+    "build": "node setup-pikafish.mjs && vite build",
     "preview": "vite preview",
     "start": "node public-online-server.mjs",
     "start:online": "node public-online-server.mjs",

@@ -1,4 +1,5 @@
-const API_BASE = "http://127.0.0.1:8787";
+const isLocalDev = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const API_BASE = window.__QILI_ENGINE_API__ || (isLocalDev ? "http://127.0.0.1:8787" : window.location.origin);
 
 const FEN_PIECES = {
   red: { rook: "R", horse: "N", elephant: "B", advisor: "A", general: "K", cannon: "C", pawn: "P" },
@@ -82,6 +83,28 @@ async function analyze(board, sideToMove, { depth = 10, multiPv = 3 } = {}) {
   };
 }
 
+async function analyzeGame(game, { depth = 7, maxPlayerMoves = 36 } = {}) {
+  if (!game || !Array.isArray(game.moves) || !game.moves.length) throw new Error("这盘棋没有可复盘的着法");
+  let token = null;
+  try {
+    token = await window.QiliIdentity?.getAuthToken?.();
+  } catch {
+    token = null;
+  }
+  const headers = { "content-type": "application/json" };
+  if (token) headers.authorization = `Bearer ${token}`;
+  return fetchJson("/api/engine/analyze-game", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      moves: game.moves,
+      playerColor: game.color,
+      depth,
+      maxPlayerMoves,
+    }),
+  });
+}
+
 async function explainCoach(coachCase) {
   return fetchJson("/api/coach/explain", {
     method: "POST",
@@ -93,6 +116,7 @@ async function explainCoach(coachCase) {
 window.XiangqiEngineClient = {
   health,
   analyze,
+  analyzeGame,
   explainCoach,
   boardToFen,
   moveToUci,

@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { coachHealth, explainCoach } from "./coach-service.mjs";
 import { handleOnlineRequest, serviceInfo as onlineServiceInfo } from "./online-game-service.mjs";
 import { handleIdentityRequest } from "./identity-service.mjs";
+import { RED, BLACK, OPPOSITE, createInitialBoard, applyMove, validateMove, gameStatus } from "./xiangqi-server-rules.mjs";
 
 const PORT = Number(process.env.ENGINE_PORT || 8787);
 const ENGINE_PATH = process.env.XIANGQI_ENGINE_PATH || "";
@@ -11,6 +12,11 @@ const ENGINE_KIND = process.env.XIANGQI_ENGINE_KIND || "pikafish";
 const DEFAULT_DEPTH = clamp(Number(process.env.ENGINE_DEPTH || 12), 4, 30);
 const DEFAULT_MULTIPV = clamp(Number(process.env.ENGINE_MULTIPV || 3), 1, 8);
 const REQUEST_TIMEOUT_MS = clamp(Number(process.env.ENGINE_TIMEOUT_MS || 12000), 2000, 60000);
+
+const FEN_PIECES = {
+  red: { rook: "R", horse: "N", elephant: "B", advisor: "A", general: "K", cannon: "C", pawn: "P" },
+  black: { rook: "r", horse: "n", elephant: "b", advisor: "a", general: "k", cannon: "c", pawn: "p" },
+};
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
@@ -33,7 +39,7 @@ async function readJson(request) {
 
   for await (const chunk of request) {
     total += chunk.length;
-    if (total > 100_000) throw new Error("Request body is too large");
+    if (total > 150_000) throw Object.assign(new Error("Request body is too large"), { statusCode: 413 });
     chunks.push(chunk);
   }
 
@@ -57,6 +63,41 @@ function validateFen(fen) {
     }
     return files === 9;
   });
+}
+
+function boardToFen(board, sideToMove) {
+  const ranks = board.map((row) => {
+    let empty = 0;
+    let output = "";
+    for (const entry of row) {
+      if (!entry) {
+        empty += 1;
+        continue;
+      }
+      if (empty) {
+        output += String(empty);
+        empty = 0;
+      }
+      output += FEN_PIECES[entry.color][entry.type];
+    }
+    if (empty) output += String(empty);
+    return output;
+  });
+  return `${ranks.join("/")} ${sideToMove === RED ? "w" : "b"} - - 0 1`;
+}
+
+function squareToUci(row, col) {
+  return `${String.fromCharCode(97 + col)}${9 - row}`;
+}
+
+function moveToUci(move) {
+  return `${squareToUci(move.fromRow, move.fromCol)}${squareToUci(move.toRow, move.toCol)}`;
+}
+
+function scoreValue(line) {
+  if (!line?.score) return 0;
+  if (line.score.type === "mate") return Math.sign(Number(line.score.value) || 1) * 100000;
+  return Number(line.score.value || 0);
 }
 
 function parseInfoLine(line) {
@@ -254,6 +295,78 @@ class UciEngine {
 
 const engine = new UciEngine(ENGINE_PATH, ENGINE_KIND, NETWORK_PATH);
 
+async function analyzeGame(body) {
+  const moves = Array.isArray(body?.moves) ? body.moves.slice(0, 120) : [];
+  const playerColor = body?.playerColor === BLACK ? BLACK : RED;
+  const depth = clamp(Number(body?.depth || 7), 4, 10);
+  const maxPlayerMoves = clamp(Number(body?.maxPlayerMoves || 36), 4, 50);
+
+  if (!moves.length) throw Object.assign(new Error("Game has no moves to analyze"), { statusCode: 400 });
+
+  let board = createInitialBoard();
+  let turn = RED;
+  const assessments = [];
+
+  for (let index = 0; index < moves.length; index += 1) {
+    const raw = moves[index] || {};
+    const candidate = raw.move || raw;
+    const checked = validateMove(board, turn, candidate);
+    if (!checked.ok) {
+      throw Object.assign(new Error(`Stored game contains an illegal move at ply ${index + 1}: ${checked.reason}`), { statusCode: 400 });
+    }
+
+    const sourceBoard = board;
+    let before = null;
+    if (turn === playerColor && assessments.length < maxPlayerMoves) {
+      before = await engine.analyze({ fen: boardToFen(sourceBoard, turn), depth, multiPv: 3 });
+    }
+
+    const moved = applyMove(sourceBoard, checked.move);
+    board = moved.board;
+
+    if (before) {
+      const stateAfter = gameStatus(board, OPPOSITE[turn]);
+      let after = null;
+      let actualScore = 0;
+      if (stateAfter.over) {
+        actualScore = stateAfter.winner === turn ? 100000 : stateAfter.winner ? -100000 : 0;
+      } else {
+        after = await engine.analyze({ fen: boardToFen(board, OPPOSITE[turn]), depth, multiPv: 1 });
+        actualScore = -scoreValue(after.lines?.[0]);
+      }
+
+      const bestScore = scoreValue(before.lines?.[0]);
+      const loss = Math.max(0, bestScore - actualScore);
+      assessments.push({
+        ply: index + 1,
+        color: turn,
+        actualMove: moveToUci(checked.move),
+        bestMove: before.lines?.[0]?.move || before.bestMove || null,
+        loss,
+        bestScore,
+        actualScore,
+        bestPv: before.lines?.[0]?.pv || [],
+        replyPv: after?.lines?.[0]?.pv || [],
+      });
+    }
+
+    turn = OPPOSITE[turn];
+  }
+
+  const ranked = [...assessments].sort((a, b) => b.loss - a.loss || a.ply - b.ply);
+  const meaningful = ranked.filter((entry) => entry.loss >= 35);
+  const turningPoints = (meaningful.length ? meaningful : ranked).slice(0, 5);
+
+  return {
+    playerColor,
+    depth,
+    scannedPlayerMoves: assessments.length,
+    totalPlies: moves.length,
+    assessments,
+    turningPoints,
+  };
+}
+
 const server = createServer(async (request, response) => {
   if (request.method === "OPTIONS") {
     response.writeHead(204, {
@@ -283,7 +396,8 @@ const server = createServer(async (request, response) => {
       port: PORT,
       coach: coachHealth(),
       online: onlineServiceInfo(),
-      apiVersion: 3,
+      apiVersion: 4,
+      capabilities: ["analyze-position", "analyze-game", "coach-explain"],
     });
     return;
   }
@@ -297,6 +411,25 @@ const server = createServer(async (request, response) => {
       console.error("[coach]", error);
       const status = Number(error?.statusCode || 500);
       json(response, status, { error: error instanceof Error ? error.message : "Unknown coach error" });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && request.url === "/api/engine/analyze-game") {
+    try {
+      if (!ENGINE_PATH) {
+        json(response, 503, {
+          error: "Engine is not configured",
+          instruction: "Set XIANGQI_ENGINE_PATH to a compatible UCI xiangqi engine binary.",
+        });
+        return;
+      }
+      const body = await readJson(request);
+      const result = await analyzeGame(body);
+      json(response, 200, result);
+    } catch (error) {
+      console.error("[analyze-game]", error);
+      json(response, Number(error?.statusCode || 500), { error: error instanceof Error ? error.message : "Game analysis failed" });
     }
     return;
   }

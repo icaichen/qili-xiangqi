@@ -1,19 +1,25 @@
-import { mkdir, writeFile, chmod, chmod as chmodAsync, readdir, stat } from "node:fs/promises";
-import { chmodSync } from "node:fs";
-import { spawnSync } from "node:child_process";
-import { join, resolve, basename } from "node:path";
-import sevenZipBin from "7zip-bin";
+import { access, chmod, copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { join, relative, resolve } from "node:path";
 
 const ROOT = process.cwd();
 const ENGINE_DIR = join(ROOT, "engine");
-const RELEASE_API = "https://api.github.com/repos/official-pikafish/Pikafish/releases/latest";
-const NETWORK_URL = "https://github.com/official-pikafish/Networks/releases/download/master-net/pikafish.nnue";
+const CONFIG_PATH = join(ENGINE_DIR, "local-engine.json");
+const RUNTIME_BINARY = join(ENGINE_DIR, "runtime-xiangqi-engine");
+const ENGINE_LICENSE_PATH = join(ENGINE_DIR, "Copying.txt");
+const ENGINE_SOURCE_PATH = join(ENGINE_DIR, "ENGINE_SOURCE.txt");
+
+// Production is pinned deliberately. Do not follow a moving "latest" release during normal deploys.
+const FAIRY_REPO = "fairy-stockfish/Fairy-Stockfish";
+const FAIRY_TAG = "fairy_sf_14_0_1_xq";
+const FAIRY_RELEASE_API = `https://api.github.com/repos/${FAIRY_REPO}/releases/tags/${FAIRY_TAG}`;
+const FAIRY_SOURCE_URL = `https://github.com/${FAIRY_REPO}/tree/${FAIRY_TAG}`;
+const FAIRY_LICENSE_URL = `https://raw.githubusercontent.com/${FAIRY_REPO}/${FAIRY_TAG}/Copying.txt`;
 
 async function fetchJson(url) {
   const response = await fetch(url, {
     headers: {
       Accept: "application/vnd.github+json",
-      "User-Agent": "xiangqi-ai-coach-local-setup",
+      "User-Agent": "qili-engine-setup",
     },
   });
   if (!response.ok) throw new Error(`Request failed (${response.status}) for ${url}`);
@@ -22,7 +28,7 @@ async function fetchJson(url) {
 
 async function download(url, destination) {
   const response = await fetch(url, {
-    headers: { "User-Agent": "xiangqi-ai-coach-local-setup" },
+    headers: { "User-Agent": "qili-engine-setup" },
     redirect: "follow",
   });
   if (!response.ok) throw new Error(`Download failed (${response.status}) for ${url}`);
@@ -31,110 +37,157 @@ async function download(url, destination) {
   return bytes.length;
 }
 
-function chooseReleaseAsset(assets) {
-  return assets.find((asset) => /pikafish.*\.(7z|zip)$/i.test(asset.name)) || null;
+function existingPath(value) {
+  if (!value) return null;
+  return value.startsWith("/") ? value : resolve(ROOT, value);
 }
 
-async function walk(directory) {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const fullPath = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await walk(fullPath));
-    else files.push(fullPath);
-  }
-  return files;
-}
-
-function extractArchive(archivePath) {
-  const executable = sevenZipBin.path7za;
+async function existingInstall() {
   try {
-    chmodSync(executable, 0o755);
+    const config = JSON.parse(await readFile(CONFIG_PATH, "utf8"));
+    const enginePath = existingPath(config.enginePath);
+    if (!enginePath) return null;
+    await access(enginePath);
+    const networkPath = existingPath(config.networkPath);
+    if (networkPath) await access(networkPath);
+    return { ...config, enginePath, networkPath };
   } catch {
-    // npm may already have installed it with the correct mode.
-  }
-  const result = spawnSync(executable, ["x", archivePath, `-o${ENGINE_DIR}`, "-y"], {
-    cwd: ROOT,
-    encoding: "utf8",
-  });
-  if (result.status !== 0) {
-    const details = [
-      result.error?.message,
-      result.stderr,
-      result.stdout,
-      `status=${result.status}`,
-      `signal=${result.signal}`,
-      `executable=${executable}`,
-    ].filter(Boolean).join("\n");
-    throw new Error(`7z extraction failed:\n${details}`);
+    return null;
   }
 }
 
-function scoreBinaryPath(file) {
-  const name = file.toLowerCase();
-  let score = 0;
-  if (name.includes("apple-silicon")) score += 100;
-  if (name.includes("arm64")) score += 80;
-  if (name.includes("macos")) score += 60;
-  if (name.includes("darwin")) score += 50;
-  if (name.includes("modern")) score += 5;
-  if (name.includes("x86") || name.includes("windows") || name.endsWith(".exe")) score -= 200;
-  return score;
+async function configureBundledLocalPikafish() {
+  // Preserve the existing Apple-Silicon development flow without downloading the non-commercial
+  // Pikafish NNUE into production. This path is only used on a developer machine where the files
+  // already exist locally.
+  if (process.platform !== "darwin") return null;
+  const candidates = process.arch === "arm64"
+    ? [join(ENGINE_DIR, "MacOS", "pikafish-apple-silicon")]
+    : [join(ENGINE_DIR, "MacOS", "pikafish")];
+  const networkPath = join(ENGINE_DIR, "pikafish.nnue");
+  for (const enginePath of candidates) {
+    try {
+      await access(enginePath);
+      await access(networkPath);
+      await chmod(enginePath, 0o755);
+      const config = {
+        kind: "pikafish",
+        release: "local-bundled",
+        platform: process.platform,
+        arch: process.arch,
+        enginePath,
+        networkPath,
+        installedAt: new Date().toISOString(),
+      };
+      await writeFile(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+      return config;
+    } catch {
+      // Try the next local candidate.
+    }
+  }
+  return null;
+}
+
+function chooseFairyAsset(assets) {
+  const candidates = (assets || []).filter((asset) => {
+    const name = String(asset?.name || "").toLowerCase();
+    if (!name.startsWith("fairy-stockfish-largeboard")) return false;
+    if (name.endsWith(".exe") || name.endsWith(".nnue") || name.endsWith(".zip") || name.endsWith(".tar.gz")) return false;
+    return true;
+  });
+
+  if (process.arch === "x64") {
+    return candidates.find((asset) => asset.name === "fairy-stockfish-largeboard_x86-64")
+      || candidates.find((asset) => /x86-64(?!.*bmi2)/i.test(asset.name))
+      || null;
+  }
+  if (process.arch === "arm64") {
+    return candidates.find((asset) => /(armv8|aarch64|arm64)/i.test(asset.name)) || null;
+  }
+  return null;
+}
+
+async function cleanRuntimeDirectory(keepPaths) {
+  const keep = new Set(keepPaths.map((item) => resolve(item)));
+  const entries = await readdir(ENGINE_DIR, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = join(ENGINE_DIR, entry.name);
+    if (keep.has(resolve(fullPath))) continue;
+    await rm(fullPath, { recursive: true, force: true });
+  }
+}
+
+async function prepareProductionFairyStockfish() {
+  if (process.platform !== "linux") {
+    console.log(`Production engine setup is Linux-only; skipping download on ${process.platform}/${process.arch}.`);
+    return null;
+  }
+
+  console.log(`Preparing Fairy-Stockfish XQ ${FAIRY_TAG} for ${process.platform}/${process.arch}...`);
+  const release = await fetchJson(FAIRY_RELEASE_API);
+  const asset = chooseFairyAsset(release.assets || []);
+  if (!asset) {
+    const available = (release.assets || []).map((item) => item.name).join(", ");
+    throw new Error(`No compatible Fairy-Stockfish Xiangqi Linux binary found. Available assets: ${available}`);
+  }
+
+  await download(asset.browser_download_url, RUNTIME_BINARY);
+  await chmod(RUNTIME_BINARY, 0o755);
+  await download(FAIRY_LICENSE_URL, ENGINE_LICENSE_PATH);
+  await writeFile(
+    ENGINE_SOURCE_PATH,
+    [
+      "Qili production Xiangqi engine",
+      `Engine: Fairy-Stockfish ${FAIRY_TAG}`,
+      `Binary release: ${release.html_url || `https://github.com/${FAIRY_REPO}/releases/tag/${FAIRY_TAG}`}`,
+      `Exact source: ${FAIRY_SOURCE_URL}`,
+      "License: GNU GPL v3 (see Copying.txt)",
+      "Qili does not modify the Fairy-Stockfish engine binary.",
+      "The dedicated XQ release contains its Xiangqi NNUE network in the binary.",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+
+  const config = {
+    kind: "fairy-stockfish",
+    release: FAIRY_TAG,
+    platform: process.platform,
+    arch: process.arch,
+    enginePath: relative(ROOT, RUNTIME_BINARY),
+    networkPath: null,
+    sourceUrl: FAIRY_SOURCE_URL,
+    installedAt: new Date().toISOString(),
+  };
+  await writeFile(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+
+  // The checked-in engine directory is excluded from Railway uploads. Build only the runtime
+  // engine plus the exact GPL/source notices into the final image.
+  await cleanRuntimeDirectory([RUNTIME_BINARY, CONFIG_PATH, ENGINE_LICENSE_PATH, ENGINE_SOURCE_PATH]);
+
+  console.log(`Fairy-Stockfish XQ installed: ${asset.name}`);
+  return config;
 }
 
 async function main() {
   await mkdir(ENGINE_DIR, { recursive: true });
 
-  console.log("Checking latest official Pikafish release...");
-  const release = await fetchJson(RELEASE_API);
-  const asset = chooseReleaseAsset(release.assets || []);
-  if (!asset) {
-    const available = (release.assets || []).map((item) => item.name).join(", ");
-    throw new Error(`No Pikafish archive found. Available assets: ${available}`);
+  const existing = await existingInstall();
+  if (existing) {
+    console.log(`Xiangqi engine already available for this build: ${existing.enginePath}`);
+    return;
   }
 
-  const archivePath = join(ENGINE_DIR, asset.name);
-  console.log(`Downloading ${asset.name} (${release.tag_name})...`);
-  await download(asset.browser_download_url, archivePath);
-
-  console.log("Extracting engine package...");
-  extractArchive(archivePath);
-
-  console.log("Downloading official Pikafish NNUE network...");
-  const networkPath = join(ENGINE_DIR, "pikafish.nnue");
-  await download(NETWORK_URL, networkPath);
-
-  const files = await walk(ENGINE_DIR);
-  const binaryCandidates = [];
-  for (const file of files) {
-    const name = basename(file);
-    if (!/^pikafish/i.test(name)) continue;
-    if (/\.(7z|zip|nnue|md|txt|json|dll|so|dylib)$/i.test(name)) continue;
-    const details = await stat(file);
-    if (details.isFile()) binaryCandidates.push(file);
+  const local = await configureBundledLocalPikafish();
+  if (local) {
+    console.log(`Using existing local Pikafish development engine: ${local.enginePath}`);
+    return;
   }
 
-  const binaryPath = binaryCandidates
-    .map((file) => ({ file, score: scoreBinaryPath(file) }))
-    .sort((a, b) => b.score - a.score || a.file.length - b.file.length)[0]?.file;
-
-  if (!binaryPath || scoreBinaryPath(binaryPath) < 50) {
-    throw new Error(`Apple Silicon Pikafish binary was not found. Candidates: ${binaryCandidates.join(", ")}`);
+  const production = await prepareProductionFairyStockfish();
+  if (!production && process.platform !== "linux") {
+    console.log("No local engine was prepared. The web bundle can still build; start the local engine separately for analysis features.");
   }
-  await chmodAsync(binaryPath, 0o755);
-
-  const config = {
-    kind: "pikafish",
-    release: release.tag_name,
-    enginePath: resolve(binaryPath),
-    networkPath: resolve(networkPath),
-    installedAt: new Date().toISOString(),
-  };
-  await writeFile(join(ENGINE_DIR, "local-engine.json"), `${JSON.stringify(config, null, 2)}\n`, "utf8");
-
-  console.log("Pikafish installed successfully.");
-  console.log(`Engine: ${config.enginePath}`);
-  console.log(`Network: ${config.networkPath}`);
 }
 
 main().catch((error) => {
