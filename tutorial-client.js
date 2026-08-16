@@ -357,5 +357,3 @@ if (rules) {
     level16Button.textContent = localStorage.getItem("qili-level16-complete") === "1" ? "重新练习" : "开始互动课";
   }
 }
-
-import("./kids-client.js");

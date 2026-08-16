@@ -1321,6 +1321,9 @@ window.QiliTutorialRules = {
   piece,
   generatePseudoMoves,
   applyMove,
+  legalMovesForPiece,
+  generateLegalMoves,
+  isInCheck,
 };
 
 const initialPlatformView = window.location.hash.replace("#", "");

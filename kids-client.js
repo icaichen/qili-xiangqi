@@ -3,13 +3,7 @@ const rules = window.QiliTutorialRules;
 if (!rules) {
   console.warn("Qili Kids: tutorial rules unavailable");
 } else {
-  const { ROWS, COLS, COLORS, createEmptyBoard, piece, generatePseudoMoves, applyMove } = rules;
-
-  const styleLink = document.createElement("link");
-  styleLink.rel = "stylesheet";
-  styleLink.href = "/kids.css";
-  styleLink.dataset.qiliKidsStyle = "1";
-  if (!document.querySelector('[data-qili-kids-style="1"]')) document.head.appendChild(styleLink);
+  const { ROWS, COLS, COLORS, createEmptyBoard, piece, generatePseudoMoves, applyMove, legalMovesForPiece, generateLegalMoves, isInCheck } = rules;
 
   const appShell = document.querySelector(".app-shell");
   const homeView = document.querySelector("#homeView");
@@ -100,7 +94,9 @@ if (!rules) {
       prompt: "把红车走到星星位置，让黑将立刻受到攻击。",
       tip: "当你的棋子下一步可以直接吃掉对方的将或帅，这就叫“将军”。",
       mode: "move",
-      pieces: [[5, 0, "rook", COLORS.RED], [0, 4, "general", COLORS.BLACK]],
+      legal: true,
+      verifyCheck: true,
+      pieces: [[5, 0, "rook", COLORS.RED], [9, 4, "general", COLORS.RED], [6, 4, "pawn", COLORS.RED], [0, 4, "general", COLORS.BLACK]],
       expected: [5, 0, 5, 4],
       success: "将军！黑将现在必须马上想办法逃开或挡住攻击。",
     },
@@ -111,9 +107,22 @@ if (!rules) {
       prompt: "黑车正在攻击红帅。把红帅移到安全的位置。",
       tip: "自己的帅被将军时，不能假装没看到。必须立刻躲开、挡住或吃掉威胁。",
       mode: "move",
+      legal: true,
       pieces: [[9, 4, "general", COLORS.RED], [5, 4, "rook", COLORS.BLACK]],
       expected: [9, 4, 9, 3],
       success: "安全了！被将军时，第一件事永远是先救自己的帅。",
+    },
+    {
+      icon: "胜",
+      title: "我的第一盘象棋",
+      subtitle: "两步小对局",
+      prompt: "先用红车吃掉黑兵，给黑将一个将军。对手会真的回应你。",
+      tip: "这次不是单独练走法。先制造将军，再观察对手怎么应对，最后找到将死。",
+      mode: "mini-game",
+      legal: true,
+      pieces: [[9, 4, "general", COLORS.RED], [3, 3, "horse", COLORS.RED], [2, 0, "rook", COLORS.RED], [0, 4, "general", COLORS.BLACK], [0, 3, "rook", COLORS.BLACK], [0, 5, "cannon", COLORS.BLACK], [1, 0, "rook", COLORS.BLACK], [2, 4, "pawn", COLORS.BLACK]],
+      expectedMoves: [[2, 0, 2, 4], [2, 4, 1, 4]],
+      success: "将死！你完成了第一盘小棋局：将军、看对手回应，再找到最后一击。",
       finale: true,
     },
   ];
@@ -126,6 +135,7 @@ if (!rules) {
   let legalTargets = [];
   let lessonDone = false;
   let feedback = null;
+  let moveStep = 0;
 
   function makeBoard(lesson) {
     const next = createEmptyBoard();
@@ -168,6 +178,7 @@ if (!rules) {
     legalTargets = [];
     lessonDone = false;
     feedback = null;
+    moveStep = 0;
     render();
   }
 
@@ -234,11 +245,11 @@ if (!rules) {
           <div class="kids-hero-copy">
             <span class="kids-eyebrow">第一章 · 第一次走进象棋世界</span>
             <h1>${chapterComplete ? "第一章完成！" : "一起认识棋盘上的新朋友"}</h1>
-            <p>${chapterComplete ? "你已经会走第一批棋子，也知道什么是将军了。" : "每次只学一个小规则。点棋盘、走一步、马上知道自己为什么做对。"}</p>
+            <p>${chapterComplete ? "你已经会走第一批棋子、认识将军，还完成了第一盘小对局。" : "每次只学一个小规则。点棋盘、走一步、马上知道自己为什么做对。"}</p>
             <button class="kids-primary-action" data-kids-resume>${chapterComplete ? "重新挑战第一章" : completed ? "继续学习" : "开始第一关"}</button>
           </div>
           <div class="kids-mascot-card" aria-label="棋理儿童陪练角色">
-            <div class="kids-mascot-speech">${chapterComplete ? "八颗星都集齐啦！" : "我叫棋仔，今天陪你走第一步。"}</div>
+            <div class="kids-mascot-speech">${chapterComplete ? "九颗星都集齐啦！" : "我叫棋仔，今天陪你走第一步。"}</div>
             <div class="kids-mascot">
               <span class="kids-mascot-eye left"></span><span class="kids-mascot-eye right"></span><span class="kids-mascot-smile"></span><strong>车</strong>
             </div>
@@ -286,10 +297,10 @@ if (!rules) {
         const pos = positionPercent(row, col);
         const selectedClass = selected?.row === row && selected?.col === col ? " selected" : "";
         const targetClass = isLegalTarget(row, col) ? (entry ? " capture" : " legal") : "";
-        const expected = lesson.expected;
+        const expected = lesson.mode === "mini-game" ? lesson.expectedMoves?.[moveStep] : lesson.expected;
         const goalClass = expected && row === expected[2] && col === expected[3] && !lessonDone ? " goal" : "";
         points.push(`
-          <button class="kids-board-point${selectedClass}${targetClass}${goalClass}" data-board-row="${row}" data-board-col="${col}" style="left:${pos.left};top:${pos.top}">
+          <button class="kids-board-point${selectedClass}${targetClass}${goalClass}" data-board-row="${row}" data-board-col="${col}" aria-label="第 ${row + 1} 行，第 ${col + 1} 列${entry ? `，${entry.label}` : ""}" style="left:${pos.left};top:${pos.top}">
             ${entry ? `<span class="kids-piece ${entry.color}">${entry.label}</span>` : ""}
           </button>`);
       }
@@ -304,7 +315,8 @@ if (!rules) {
 
   function renderLesson() {
     const lesson = LESSONS[lessonIndex];
-    const message = feedback || { kind: "neutral", title: "轮到你啦", text: lesson.prompt };
+    const promptText = lesson.mode === "mini-game" && moveStep === 1 ? "黑车挡住了将军。现在用红车吃掉它，看看能不能结束小棋局。" : lesson.prompt;
+    const message = feedback || { kind: "neutral", title: "轮到你啦", text: promptText };
     renderShell(`
       <main class="kids-lesson-page">
         <button class="kids-back-map" data-back-map>← 回到学习地图</button>
@@ -316,7 +328,7 @@ if (!rules) {
 
         <section class="kids-lesson-layout">
           <div class="kids-lesson-main">
-            <div class="kids-lesson-title"><span class="kids-lesson-icon">${lesson.icon}</span><div><small>${lesson.subtitle}</small><h1>${lesson.title}</h1><p>${lesson.prompt}</p></div></div>
+            <div class="kids-lesson-title"><span class="kids-lesson-icon">${lesson.icon}</span><div><small>${lesson.subtitle}</small><h1>${lesson.title}</h1><p>${promptText}</p></div></div>
             ${renderBoard()}
             <div class="kids-feedback ${message.kind}"><span class="kids-feedback-face">${message.kind === "success" ? "★" : message.kind === "error" ? "!" : "?"}</span><div><strong>${message.title}</strong><p>${message.text}</p></div></div>
           </div>
@@ -363,7 +375,7 @@ if (!rules) {
       return;
     }
 
-    const expected = lesson.expected;
+    const expected = lesson.mode === "mini-game" ? lesson.expectedMoves?.[moveStep] : lesson.expected;
     if (!expected) return;
 
     if (!selected) {
@@ -372,7 +384,7 @@ if (!rules) {
         return;
       }
       selected = { row, col };
-      legalTargets = generatePseudoMoves(board, row, col);
+      legalTargets = lesson.legal ? legalMovesForPiece(board, row, col) : generatePseudoMoves(board, row, col);
       feedback = { kind: "neutral", title: "选中了！", text: "现在把它走到星星目标位置。亮起来的点都是这枚棋子按基础规则能到的位置。" };
       render();
       return;
@@ -399,6 +411,39 @@ if (!rules) {
     }
 
     board = applyMove(board, move).board;
+
+    if (lesson.verifyCheck && !isInCheck(board, COLORS.BLACK)) {
+      fail("还没有形成将军", "这一步虽然能走，但黑将还没有真正受到攻击。" );
+      return;
+    }
+
+    if (lesson.mode === "mini-game") {
+      if (moveStep === 0) {
+        if (!isInCheck(board, COLORS.BLACK)) {
+          fail("还没有将军", "第一步要先让黑将进入被攻击状态。" );
+          return;
+        }
+        const reply = generateLegalMoves(board, COLORS.BLACK).find((candidate) => candidate.fromRow === 1 && candidate.fromCol === 0 && candidate.toRow === 1 && candidate.toCol === 4);
+        if (!reply) {
+          fail("小棋局需要重来", "没有找到预期的合法应将。请重新试一次。" );
+          return;
+        }
+        board = applyMove(board, reply).board;
+        moveStep = 1;
+        selected = null;
+        legalTargets = [];
+        feedback = { kind: "neutral", title: "对手挡住了！", text: "黑车赶来挡住将军。现在轮到你，再找最后一击。" };
+        render();
+        return;
+      }
+
+      const checkmate = isInCheck(board, COLORS.BLACK) && generateLegalMoves(board, COLORS.BLACK).length === 0;
+      if (!checkmate) {
+        fail("还没有结束", "黑方还有合法的应对。再看看有没有更强的一步。" );
+        return;
+      }
+    }
+
     markLessonComplete();
   }
 
