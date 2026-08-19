@@ -368,6 +368,7 @@ function ensureReviewStyles() {
   style.id = "qiliReviewStyles";
   style.textContent = `
     #reviewDropzone.platform-page{max-width:1560px;margin:0 auto}
+    #reviewDropzone.platform-page.hidden{display:none!important}
     .review-game-list,.review-turn-list{display:grid;gap:8px;margin-top:16px}
     .review-game-row,.review-turn-row{width:100%;border:1px solid rgba(31,45,37,.09);border-radius:14px;background:#f7f8f5;padding:13px 14px;text-align:left;color:inherit;font:inherit;display:grid;gap:5px;transition:.16s ease}
     .review-game-row:hover,.review-turn-row:hover{background:#fff;border-color:rgba(35,75,59,.2);transform:translateY(-1px)}

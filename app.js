@@ -749,6 +749,24 @@ function performMove(move, color) {
   return { sourceBoard, result, notation };
 }
 
+async function analyzeHumanMoveInBackground(sourceBoard, afterHumanBoard, move) {
+  if (!analysisToggleElement?.checked || !engineConnected || gameOver) return;
+  try {
+    const settings = engineSettings();
+    const coachDepth = Math.max(8, Math.min(14, settings.depth));
+    const before = await engineClient.analyze(sourceBoard, COLORS.RED, { depth: coachDepth, multiPv: 8 });
+    const after = await engineClient.analyze(afterHumanBoard, COLORS.BLACK, { depth: coachDepth, multiPv: 3 });
+    coachAnalysis = buildCoachAnalysis(sourceBoard, move, before, after);
+    requestAiCoachExplanation(coachAnalysis);
+    renderCoach();
+  } catch (error) {
+    console.warn("[coach-background-analysis]", error);
+    if (!gameOver && engineConnected) {
+      engineStateElement.textContent = "Pikafish 已连接 · 本手讲解稍后再试";
+    }
+  }
+}
+
 async function performHumanMove(move) {
   if (locked || gameOver || pausedAfterUndo) return;
   clearMoveSuggestions();
@@ -758,22 +776,12 @@ async function performHumanMove(move) {
   if (!engineConnected && !(await initializeEngine())) { locked = false; render(); return; }
   const sourceBoard = cloneBoard(board);
   performMove(move, COLORS.RED);
+  const afterHumanBoard = cloneBoard(board);
   currentTurn = COLORS.BLACK;
-  engineStateElement.textContent = "Pikafish 正在比较两条路线…";
+  engineStateElement.textContent = "Pikafish 正在选择应对…";
   render();
   if (finishIfNeeded()) return;
   try {
-    const settings = engineSettings();
-    if (analysisToggleElement.checked) {
-      const coachDepth = Math.max(8, Math.min(14, settings.depth));
-      const before = await engineClient.analyze(sourceBoard, COLORS.RED, { depth: coachDepth, multiPv: 8 });
-      const after = await engineClient.analyze(board, COLORS.BLACK, { depth: coachDepth, multiPv: 3 });
-      coachAnalysis = buildCoachAnalysis(sourceBoard, move, before, after);
-      engineEvaluationCp = -(after.lines[0]?.numericScore ?? 0);
-      requestAiCoachExplanation(coachAnalysis);
-      renderCoach();
-      renderEvaluation();
-    }
     await performComputerMove();
   } catch (error) {
     engineConnected = false;
@@ -781,7 +789,9 @@ async function performHumanMove(move) {
     engineStateElement.textContent = "引擎错误：" + engineError;
     locked = false;
     render();
+    return;
   }
+  void analyzeHumanMoveInBackground(sourceBoard, afterHumanBoard, move);
 }
 
 async function performComputerMove() {
