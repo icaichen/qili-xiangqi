@@ -573,6 +573,10 @@ async function chooseComputerMove() {
     });
     const selectedLine = coachTools.chooseLine(analysis.lines, level);
     if (selectedLine?.parsedMove) return { move: selectedLine.parsedMove, analysis, selectedLine };
+    const bestMove = engineClient.uciToMove(analysis.bestMove, board);
+    if (bestMove) {
+      return { move: bestMove, analysis, selectedLine: null, bestMoveOnly: true };
+    }
   } catch (error) {
     console.warn("[computer-engine]", error);
   }
