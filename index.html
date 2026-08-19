@@ -472,14 +472,32 @@
       </div>
     </div>
 
-    <script type="module" src="/engine-client.js"></script>
-    <script type="module" src="/coach-tools.js"></script>
-    <script type="module" src="/app.js"></script>
-    <script type="module" src="/analysis-client.js"></script>
-    <script type="module" src="/tutorial-client.js"></script>
-    <script type="module" src="/kids-client.js"></script>
-    <script type="module" src="/auth-client.js"></script>
-    <script type="module" src="/identity-client.js"></script>
-    <script type="module" src="/online-client.js"></script>
+    <script type="module">
+      const bootSteps = [
+        ["engine-client", () => import("/engine-client.js")],
+        ["coach-tools", () => import("/coach-tools.js")],
+        ["app", () => import("/app.js")],
+        ["analysis-client", () => import("/analysis-client.js")],
+        ["tutorial-client", () => import("/tutorial-client.js")],
+        ["kids-client", () => import("/kids-client.js")],
+        ["auth-client", () => import("/auth-client.js")],
+        ["identity-client", () => import("/identity-client.js")],
+        ["online-client", () => import("/online-client.js")],
+      ];
+
+      for (const [name, load] of bootSteps) {
+        try {
+          await load();
+        } catch (error) {
+          console.error(`[qili-boot] ${name} failed`, error);
+          const message = document.createElement("div");
+          message.setAttribute("role", "alert");
+          message.style.cssText = "position:fixed;left:16px;right:16px;bottom:16px;z-index:99999;padding:12px 14px;border-radius:10px;background:#6f2f28;color:#fff;font:13px/1.5 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.22)";
+          message.textContent = `前端启动失败：${name} · ${error instanceof Error ? error.message : String(error)}`;
+          document.body.appendChild(message);
+          break;
+        }
+      }
+    </script>
   </body>
 </html>

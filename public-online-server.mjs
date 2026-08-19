@@ -265,8 +265,17 @@ const server = createServer(async (request, response) => {
   const pathname = decodeURIComponent(url.pathname);
   const normalized = normalize(pathname).replace(/^([/\\])+/, "");
   const candidate = join(DIST_DIR, normalized || "index.html");
+  const isAssetRequest = pathname.startsWith("/assets/") || /\/[^/]+\.[^/]+$/.test(pathname);
 
   if (candidate.startsWith(DIST_DIR) && await sendFile(request, response, candidate)) return;
+  if (isAssetRequest) {
+    response.writeHead(404, {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+    });
+    response.end(request.method === "HEAD" ? undefined : "Not found");
+    return;
+  }
   await sendFile(request, response, join(DIST_DIR, "index.html"));
 });
 
