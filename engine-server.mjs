@@ -233,6 +233,9 @@ class UciEngine {
       await this.start();
       const depth = clamp(Number(request.depth || DEFAULT_DEPTH), 4, 30);
       const multipv = clamp(Number(request.multiPv || DEFAULT_MULTIPV), 1, 8);
+      const requestedMaxTime = Number(request.maxTimeMs || 0);
+      const maxTimeMs = Number.isFinite(requestedMaxTime) && requestedMaxTime > 0
+        ? clamp(requestedMaxTime, 100, Math.max(100, REQUEST_TIMEOUT_MS - 500)) : 0;
       const linesByRank = new Map();
 
       this.send(`setoption name MultiPV value ${multipv}`);
@@ -243,7 +246,7 @@ class UciEngine {
           this.send("stop");
           cleanup();
           reject(new Error("Analysis timed out"));
-        }, REQUEST_TIMEOUT_MS);
+        }, maxTimeMs ? Math.min(REQUEST_TIMEOUT_MS, maxTimeMs + 1000) : REQUEST_TIMEOUT_MS);
 
         const waiter = {
           handle: (line) => {
@@ -273,7 +276,7 @@ class UciEngine {
         };
 
         this.waiters.push(waiter);
-        this.send(`go depth ${depth}`);
+        this.send(maxTimeMs ? `go movetime ${maxTimeMs}` : `go depth ${depth}`);
       });
 
       return completed;

@@ -65,12 +65,12 @@ async function health() {
   return fetchJson("/api/engine/health");
 }
 
-async function analyze(board, sideToMove, { depth = 10, multiPv = 3 } = {}) {
+async function analyze(board, sideToMove, { depth = 10, multiPv = 3, maxTimeMs = null } = {}) {
   const fen = boardToFen(board, sideToMove);
   const result = await fetchJson("/api/engine/analyze", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ fen, depth, multiPv }),
+    body: JSON.stringify({ fen, depth, multiPv, maxTimeMs }),
   });
   return {
     ...result,

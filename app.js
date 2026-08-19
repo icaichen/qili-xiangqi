@@ -549,15 +549,42 @@ async function refreshMoveSuggestions() {
   }
 }
 
+function computerMoveTimeBudget(level) {
+  return {
+    "800": 400,
+    "1000": 500,
+    "1200": 650,
+    "1400": 800,
+    "1600": 1000,
+    "1800": 1200,
+    "2000": 1500,
+    max: 2200,
+  }[level] || 800;
+}
+
 async function chooseComputerMove() {
+  const level = levelSelectElement.value;
   const settings = engineSettings();
-  const analysis = await engineClient.analyze(board, COLORS.BLACK, {
-    depth: settings.depth,
-    multiPv: settings.multiPv,
-  });
-  const selectedLine = coachTools.chooseLine(analysis.lines, levelSelectElement.value);
-  if (!selectedLine?.parsedMove) return null;
-  return { move: selectedLine.parsedMove, analysis, selectedLine };
+  try {
+    const analysis = await engineClient.analyze(board, COLORS.BLACK, {
+      depth: Math.min(settings.depth, level === "max" ? 14 : 10),
+      multiPv: Math.min(settings.multiPv, level === "max" ? 3 : 4),
+      maxTimeMs: computerMoveTimeBudget(level),
+    });
+    const selectedLine = coachTools.chooseLine(analysis.lines, level);
+    if (selectedLine?.parsedMove) return { move: selectedLine.parsedMove, analysis, selectedLine };
+  } catch (error) {
+    console.warn("[computer-engine]", error);
+  }
+
+  const fallbackMove = rankMoves(board, COLORS.BLACK, 5)[0] || null;
+  if (!fallbackMove) return null;
+  return {
+    move: fallbackMove,
+    analysis: { lines: [] },
+    selectedLine: null,
+    fallback: true,
+  };
 }
 function sameMove(a, b) {
   return a.fromRow === b.fromRow && a.fromCol === b.fromCol && a.toRow === b.toRow && a.toCol === b.toCol;
@@ -754,8 +781,8 @@ async function analyzeHumanMoveInBackground(sourceBoard, afterHumanBoard, move) 
   try {
     const settings = engineSettings();
     const coachDepth = Math.max(8, Math.min(14, settings.depth));
-    const before = await engineClient.analyze(sourceBoard, COLORS.RED, { depth: coachDepth, multiPv: 8 });
-    const after = await engineClient.analyze(afterHumanBoard, COLORS.BLACK, { depth: coachDepth, multiPv: 3 });
+    const before = await engineClient.analyze(sourceBoard, COLORS.RED, { depth: coachDepth, multiPv: 4, maxTimeMs: 500 });
+    const after = await engineClient.analyze(afterHumanBoard, COLORS.BLACK, { depth: coachDepth, multiPv: 2, maxTimeMs: 350 });
     coachAnalysis = buildCoachAnalysis(sourceBoard, move, before, after);
     requestAiCoachExplanation(coachAnalysis);
     renderCoach();
@@ -799,11 +826,15 @@ async function performComputerMove() {
   engineStateElement.textContent = "Pikafish 正在选择应对…";
   const choice = await chooseComputerMove();
   if (!choice) { locked = false; finishIfNeeded(); return; }
-  engineEvaluationCp = -(choice.analysis.lines[0]?.numericScore ?? 0);
+  if (choice.analysis?.lines?.length) {
+    engineEvaluationCp = -(choice.analysis.lines[0]?.numericScore ?? 0);
+  }
   performMove(choice.move, COLORS.BLACK);
   currentTurn = COLORS.RED;
   locked = false;
-  engineStateElement.textContent = "Pikafish 已连接";
+  engineStateElement.textContent = choice.fallback
+    ? "Pikafish 响应较慢 · 本手已用本地应对"
+    : "Pikafish 已连接";
   render();
   if (!finishIfNeeded()) refreshMoveSuggestions();
 }
