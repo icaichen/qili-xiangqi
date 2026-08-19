@@ -46,7 +46,7 @@ async function loadComputerRatings(pgPool) {
       label: seed.label,
       unbounded: Boolean(seed.unbounded),
       ...record,
-      calibrated: Number(row.games || 0) >= 20 && Number(row.deviation || QILI_RD_DEFAULT) <= 120,
+      calibrated: !record.provisional,
     };
   }
   return output;
@@ -86,12 +86,11 @@ async function recordComputerCalibration(pgPool, { gameId, userId, level, winner
     const userResult = await client.query(
       `SELECT pool, rating, deviation, volatility, last_rated_at, games, wins, draws, losses
          FROM qili_ratings
-        WHERE user_id = $1 AND games >= 10`,
+        WHERE user_id = $1 AND games >= 3`,
       [userId],
     );
     const eligibleUsers = userResult.rows
       .map((row) => ({ ...row, ...inflateRatingForInactivity(row, row.last_rated_at) }))
-      .filter((row) => Number(row.deviation) <= 110)
       .sort((a, b) => Number(a.deviation) - Number(b.deviation) || Number(b.games) - Number(a.games));
     if (!eligibleUsers.length) {
       await client.query("COMMIT");
@@ -156,7 +155,7 @@ async function recordComputerCalibration(pgPool, { gameId, userId, level, winner
       accepted: true,
       level: levelId,
       rating: publicRecord,
-      calibrated: publicRecord.games >= 20 && publicRecord.deviation <= 120,
+      calibrated: !publicRecord.provisional,
     };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
