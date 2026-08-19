@@ -101,6 +101,15 @@ function scoreValue(line) {
   return Number(line.score.value || 0);
 }
 
+function normalizeEngineMove(move) {
+  if (ENGINE_KIND !== "fairy-stockfish" || typeof move !== "string") return move;
+  const match = move.match(/^([a-i])(10|[1-9])([a-i])(10|[1-9])$/);
+  if (!match) return move;
+  const fromRank = Number(match[2]) - 1;
+  const toRank = Number(match[4]) - 1;
+  return match[1] + fromRank + match[3] + toRank;
+}
+
 function parseInfoLine(line) {
   if (!line.startsWith("info ") || !line.includes(" pv ")) return null;
   const depthMatch = line.match(/\bdepth\s+(\d+)/);
@@ -110,7 +119,8 @@ function parseInfoLine(line) {
   const nodesMatch = line.match(/\bnodes\s+(\d+)/);
   const timeMatch = line.match(/\btime\s+(\d+)/);
   const pvIndex = line.indexOf(" pv ");
-  const pv = pvIndex >= 0 ? line.slice(pvIndex + 4).trim().split(/\s+/).filter(Boolean) : [];
+  const rawPv = pvIndex >= 0 ? line.slice(pvIndex + 4).trim().split(/\s+/).filter(Boolean) : [];
+  const pv = rawPv.map(normalizeEngineMove);
 
   if (!pv.length) return null;
 
@@ -258,7 +268,7 @@ class UciEngine {
 
             if (line.startsWith("bestmove ")) {
               cleanup();
-              const bestMove = line.split(/\s+/)[1] || null;
+              const bestMove = normalizeEngineMove(line.split(/\s+/)[1] || null);
               resolve({
                 bestMove,
                 depth,
