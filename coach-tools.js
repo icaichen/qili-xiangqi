@@ -158,7 +158,7 @@ function positionSignals(board, color, focusSquare, adapters) {
   };
 }
 
-function buildCoachAnalysis({ sourceBoard, move, beforeAnalysis, afterAnalysis, adapters }) {
+function buildCoachAnalysis({ sourceBoard, move, beforeAnalysis, afterAnalysis, adapters, routeLimit = 8 }) {
   const chosenUci = adapters.moveToUci(move);
   const lines = beforeAnalysis.lines.filter((line) => line.parsedMove);
   const bestLine = lines[0];
@@ -191,8 +191,9 @@ function buildCoachAnalysis({ sourceBoard, move, beforeAnalysis, afterAnalysis, 
   const chosenPv = selectedLine?.pv?.length
     ? selectedLine.pv
     : [chosenUci, ...(replyLine?.pv || [])];
-  const yourRoute = routeData(sourceBoard, chosenPv, adapters, 8);
-  const bestRoute = routeData(sourceBoard, bestLine?.pv || [], adapters, 8);
+  const safeRouteLimit = Math.max(4, Math.min(12, Number(routeLimit) || 8));
+  const yourRoute = routeData(sourceBoard, chosenPv, adapters, safeRouteLimit);
+  const bestRoute = routeData(sourceBoard, bestLine?.pv || [], adapters, safeRouteLimit);
   const sameRoute = selectedIsBest || yourRoute.sequence === bestRoute.sequence;
   const yourRouteResult = analyzeRoute(sourceBoard, yourRoute.steps, mover?.color, adapters);
   const bestRouteResult = analyzeRoute(sourceBoard, bestRoute.steps, mover?.color, adapters);

@@ -8,6 +8,7 @@ import {
   updateUserDisplayName,
   getRatingsForUser,
   listGamesForUser,
+  initializePersistence,
   persistenceInfo,
 } from "./online-persistence.mjs";
 
@@ -120,8 +121,16 @@ async function handleIdentityRequest(request, response) {
       return true;
     }
 
-    if (!persistenceInfo().postgresReady) {
-      throw Object.assign(new Error("Identity database is not ready"), { statusCode: 503 });
+    let persistence = persistenceInfo();
+    if (!persistence.postgresReady) {
+      await initializePersistence();
+      persistence = persistenceInfo();
+    }
+    if (!persistence.postgresReady) {
+      const message = persistence.postgresConfigured
+        ? "Identity database failed to initialize"
+        : "Identity database is not configured";
+      throw Object.assign(new Error(message), { statusCode: 503 });
     }
 
     if (request.method === "POST" && url.pathname === "/api/auth/claim") {

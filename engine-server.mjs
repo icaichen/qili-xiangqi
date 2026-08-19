@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { coachHealth, explainCoach } from "./coach-service.mjs";
+import { recognizeBoardFromImage, recognitionHealth } from "./analysis-service.mjs";
 import { handleOnlineRequest, serviceInfo as onlineServiceInfo } from "./online-game-service.mjs";
 import { handleIdentityRequest } from "./identity-service.mjs";
 import { RED, BLACK, OPPOSITE, createInitialBoard, applyMove, validateMove, gameStatus } from "./xiangqi-server-rules.mjs";
@@ -395,10 +396,23 @@ const server = createServer(async (request, response) => {
       kind: ENGINE_KIND,
       port: PORT,
       coach: coachHealth(),
+      analysis: recognitionHealth(),
       online: onlineServiceInfo(),
       apiVersion: 4,
-      capabilities: ["analyze-position", "analyze-game", "coach-explain"],
+      capabilities: ["analyze-position", "analyze-game", "coach-explain", "recognize-board"],
     });
+    return;
+  }
+
+  if (request.method === "POST" && request.url === "/api/coach/recognize-board") {
+    try {
+      const body = await readJson(request);
+      const recognition = await recognizeBoardFromImage(body);
+      json(response, 200, recognition);
+    } catch (error) {
+      console.error("[recognize-board]", error);
+      json(response, Number(error?.statusCode || 500), { error: error instanceof Error ? error.message : "截图识别失败" });
+    }
     return;
   }
 

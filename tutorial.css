@@ -5,6 +5,11 @@
   overflow: hidden;
 }
 
+.lesson-workspace[hidden],
+.lesson-workspace.hidden {
+  display: none;
+}
+
 .lesson-sidebar {
   padding: 24px;
   border-right: 1px solid rgba(35, 50, 42, 0.1);

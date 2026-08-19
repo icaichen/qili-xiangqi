@@ -1,7 +1,10 @@
+import { QILI_CURRICULUM_STAGES } from "./xiangqi-teaching-curriculum.mjs";
+
 const ROWS = 10;
 const COLS = 9;
 const COLORS = { RED: "red", BLACK: "black" };
 const OPPOSITE = { red: "black", black: "red" };
+const COMPUTER_GAME_HISTORY_KEY = "qili-computer-games-v1";
 
 const PIECE_LABELS = {
   red: { rook: "车", horse: "马", elephant: "相", advisor: "仕", general: "帅", cannon: "炮", pawn: "兵" },
@@ -52,6 +55,15 @@ const undoButtonElement = document.querySelector("#undoButton");
 const resumeButtonElement = document.querySelector("#resumeButton");
 const newGameButtonElement = document.querySelector("#newGameButton");
 const flipButtonElement = document.querySelector("#flipButton");
+const gameResultOverlayElement = document.querySelector("#gameResultOverlay");
+const gameResultMarkElement = document.querySelector("#gameResultMark");
+const gameResultTitleElement = document.querySelector("#gameResultTitle");
+const gameResultReasonElement = document.querySelector("#gameResultReason");
+const gameResultOpponentElement = document.querySelector("#gameResultOpponent");
+const gameResultMovesElement = document.querySelector("#gameResultMoves");
+const reviewFinishedGameButtonElement = document.querySelector("#reviewFinishedGameButton");
+const rematchButtonElement = document.querySelector("#rematchButton");
+const dismissGameResultButtonElement = document.querySelector("#dismissGameResultButton");
 const workspaceElement = document.querySelector(".workspace");
 const reviewDropzoneElement = document.querySelector("#reviewDropzone");
 const platformViews = {
@@ -84,11 +96,13 @@ let engineEvaluationCp = null;
 let pausedAfterUndo = false;
 let moveSuggestions = [];
 let suggestionRequestId = 0;
-let routePreviewState = { route: null, index: 0, title: "" };
+let routePreviewState = { route: null, index: 0, title: "", sourceBoard: null };
 let aiCoachConfigured = false;
 let aiCoachServerAvailable = false;
 let aiCoachModel = "";
 let aiCoachRequestId = 0;
+let computerGameId = createComputerGameId();
+let computerGameStartedAt = Date.now();
 
 function createEmptyBoard() {
   return Array.from({ length: ROWS }, () => Array(COLS).fill(null));
@@ -631,7 +645,7 @@ function principleForMove(sourceBoard, move) {
   return "每步先问三个问题：对手威胁什么、我有没有强制手段、这一步是否让最差的棋子变得更有用。";
 }
 
-function buildCoachAnalysis(sourceBoard, move, beforeAnalysis, afterAnalysis) {
+function buildCoachAnalysis(sourceBoard, move, beforeAnalysis, afterAnalysis, options = {}) {
   return coachTools.buildCoachAnalysis({
     sourceBoard,
     move,
@@ -649,7 +663,72 @@ function buildCoachAnalysis(sourceBoard, move, beforeAnalysis, afterAnalysis) {
       opposite: OPPOSITE,
       generateLegalMoves,
     },
+    routeLimit: options.routeLimit || 8,
   });
+}
+
+function createComputerGameId() {
+  return window.crypto?.randomUUID?.() || `computer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function saveComputerGameToHistory(result) {
+  if (!history.length) return;
+  const level = String(levelSelectElement?.value || "1400");
+  const record = {
+    id: computerGameId,
+    source: "computer",
+    createdAt: computerGameStartedAt,
+    startedAt: computerGameStartedAt,
+    finishedAt: Date.now(),
+    timeControl: { mode: "computer", level, label: `Pikafish · ${level}` },
+    color: "red",
+    opponent: `Pikafish · ${level}`,
+    result,
+    moves: history.map((entry, index) => ({
+      ply: index + 1,
+      color: entry.color,
+      move: { ...entry.move },
+      notation: entry.notation,
+      captured: entry.captured?.label || null,
+    })),
+  };
+  try {
+    const stored = JSON.parse(localStorage.getItem(COMPUTER_GAME_HISTORY_KEY) || "[]");
+    const previous = Array.isArray(stored) ? stored : [];
+    const next = [record, ...previous.filter((item) => item?.id !== record.id)]
+      .sort((a, b) => Number(new Date(b.finishedAt)) - Number(new Date(a.finishedAt)))
+      .slice(0, 30);
+    localStorage.setItem(COMPUTER_GAME_HISTORY_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent("qili-game-finished", { detail: { source: "computer", game: record } }));
+  } catch (error) {
+    console.warn("[computer-review-save]", error);
+  }
+}
+
+function hideGameResult() {
+  gameResultOverlayElement?.classList.add("hidden");
+}
+
+function gameResultReasonText(result, didWin) {
+  if (result?.reason === "checkmate") return didWin ? "将死对手" : "被将死";
+  if (result?.reason === "general-captured") return didWin ? "吃掉黑将" : "红帅被吃";
+  if (result?.reason === "no-legal-moves") return didWin ? "对手无合法着可走" : "无合法着可走";
+  return result?.winner ? "本局结束" : "和棋";
+}
+
+function showGameResult(result) {
+  if (!gameResultOverlayElement) return;
+  const didWin = result?.winner === COLORS.RED;
+  const isDraw = !result?.winner;
+  const level = String(levelSelectElement?.value || "1200");
+  const opponent = level === "max" ? "Pikafish · 全力" : "Pikafish · " + level;
+  gameResultOverlayElement.classList.remove("hidden", "win", "loss", "draw");
+  gameResultOverlayElement.classList.add(isDraw ? "draw" : didWin ? "win" : "loss");
+  if (gameResultMarkElement) gameResultMarkElement.textContent = isDraw ? "和" : didWin ? "胜" : "负";
+  if (gameResultTitleElement) gameResultTitleElement.textContent = isDraw ? "本局和棋" : didWin ? "本局获胜" : "本局落败";
+  if (gameResultReasonElement) gameResultReasonElement.textContent = gameResultReasonText(result, didWin);
+  if (gameResultOpponentElement) gameResultOpponentElement.textContent = opponent;
+  if (gameResultMovesElement) gameResultMovesElement.textContent = history.length + " 手";
 }
 
 function performMove(move, color) {
@@ -728,9 +807,16 @@ function finishIfNeeded() {
     gameOver = true;
     locked = true;
     const winner = !redGeneral || (currentTurn === COLORS.RED && legal.length === 0) ? "黑方" : "红方";
+    const winnerColor = winner === "红方" ? COLORS.RED : COLORS.BLACK;
+    const reason = !redGeneral || !blackGeneral
+      ? "general-captured"
+      : isInCheck(board, currentTurn) ? "checkmate" : "no-legal-moves";
     statusBadgeElement.textContent = `${winner}获胜`;
     turnTextElement.textContent = "本局结束";
     lastMoveLabelElement.textContent = `${winner}获胜 · 可以重新开始或悔棋`;
+    const result = { winner: winnerColor, reason };
+    saveComputerGameToHistory(result);
+    showGameResult(result);
     renderBoard();
     return true;
   }
@@ -890,7 +976,7 @@ function compactBoardForAi(sourceBoard) {
   return sourceBoard.map((row) => row.map((entry) => entry ? entry.color + ":" + entry.type + ":" + entry.label : null));
 }
 
-function buildAiCoachCase(analysis) {
+function buildAiCoachCase(analysis, mode = "play") {
   const evidenceCatalog = [
     { id: "board-position", type: "board-position", text: "完整棋盘位置已提供；row 0 是黑方底线，row 9 是红方底线。" },
     { id: "engine-choice", type: "engine-choice", text: "你的走法：" + analysis.moveNotation + "；Pikafish首选：" + analysis.bestMove + "。" },
@@ -912,7 +998,8 @@ function buildAiCoachCase(analysis) {
   evidenceCatalog.push({ id: "signals-chosen", type: "position-signals", text: "你的走法后局面指标：" + JSON.stringify(analysis.signals?.chosen || {}) });
   evidenceCatalog.push({ id: "signals-best", type: "position-signals", text: "首选着后局面指标：" + JSON.stringify(analysis.signals?.best || {}) });
 
-  const routeForAi = (route, prefix) => (route?.steps || []).slice(0, 8).map((step, index) => {
+  const routeLimit = mode === "review" ? 10 : 8;
+  const routeForAi = (route, prefix) => (route?.steps || []).slice(0, routeLimit).map((step, index) => {
     const id = prefix + "-" + (index + 1);
     const text = step.notation + (step.facts?.length ? "；确定事实：" + step.facts.map((fact) => fact.title + "（" + fact.detail + "）").join("；") : "");
     evidenceCatalog.push({ id, text });
@@ -920,6 +1007,7 @@ function buildAiCoachCase(analysis) {
   });
 
   return {
+    mode,
     move: {
       notation: analysis.moveNotation,
       bestMove: analysis.bestMove,
@@ -941,6 +1029,35 @@ function buildAiCoachCase(analysis) {
       best: routeForAi(analysis.routes?.best, "best-route"),
     },
     evidenceCatalog,
+  };
+}
+
+async function analyzeReviewPosition(sourceBoard, move, options = {}) {
+  if (!engineConnected && !(await initializeEngine())) {
+    throw new Error(engineError || "Pikafish 连接失败");
+  }
+  const mover = sourceBoard?.[move?.fromRow]?.[move?.fromCol];
+  if (!mover) throw new Error("无法读取这一步的起始棋盘");
+  const depth = Math.max(8, Math.min(16, Number(options.depth) || 12));
+  const routeLimit = Math.max(6, Math.min(12, Number(options.routeLimit) || 10));
+  const before = await engineClient.analyze(sourceBoard, mover.color, { depth, multiPv: 8 });
+  const afterBoard = applyMove(sourceBoard, move).board;
+  const after = await engineClient.analyze(afterBoard, OPPOSITE[mover.color], { depth, multiPv: 3 });
+  const analysis = buildCoachAnalysis(sourceBoard, move, before, after, { routeLimit });
+  let ai = null;
+  let aiError = null;
+  if (aiCoachServerAvailable && aiCoachConfigured) {
+    try {
+      ai = await engineClient.explainCoach(buildAiCoachCase(analysis, "review"));
+    } catch (error) {
+      aiError = error instanceof Error ? error.message : "AI 复盘解释失败";
+    }
+  }
+  return {
+    analysis,
+    ai,
+    aiError,
+    aiAvailable: Boolean(aiCoachServerAvailable && aiCoachConfigured),
   };
 }
 
@@ -1085,6 +1202,9 @@ function resetGame() {
   coachAnalysis = null;
   engineEvaluationCp = null;
   pausedAfterUndo = false;
+  computerGameId = createComputerGameId();
+  computerGameStartedAt = Date.now();
+  hideGameResult();
   clearMoveSuggestions();
   lastMoveLabelElement.textContent = "请选择一个棋子开始";
   render();
@@ -1102,6 +1222,7 @@ function restoreAfterUndo(removeCount, forceRedTurn) {
   gameOver = false;
   coachAnalysis = null;
   engineEvaluationCp = null;
+  hideGameResult();
   lastMoveLabelElement.textContent = history.length ? "已回到 " + history.at(-1).notation + " 之后" : "请选择一个棋子开始";
 }
 
@@ -1138,7 +1259,9 @@ async function resumeAfterUndo() {
 }
 
 function previewBoardAt(route, index) {
-  let previewBoard = cloneBoard(coachAnalysis.sourceBoard);
+  const sourceBoard = routePreviewState.sourceBoard || coachAnalysis?.sourceBoard;
+  if (!sourceBoard) return createEmptyBoard();
+  let previewBoard = cloneBoard(sourceBoard);
   for (let stepIndex = 0; stepIndex < index; stepIndex += 1) {
     previewBoard = applyMove(previewBoard, route.steps[stepIndex].move).board;
   }
@@ -1183,6 +1306,20 @@ function openRoutePreview(routeKey) {
     route: coachAnalysis.routes[routeKey],
     index: 0,
     title: routeKey === "best" ? "Pikafish 首选路线" : "你的走法路线",
+    sourceBoard: cloneBoard(coachAnalysis.sourceBoard),
+  };
+  routePreviewModalElement.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+  renderRoutePreview();
+}
+
+function openExternalRoutePreview(route, sourceBoard, title = "复盘路线") {
+  if (!route?.steps?.length || !sourceBoard) return;
+  routePreviewState = {
+    route,
+    index: 0,
+    title,
+    sourceBoard: cloneBoard(sourceBoard),
   };
   routePreviewModalElement.classList.remove("hidden");
   document.body.classList.add("modal-open");
@@ -1194,7 +1331,12 @@ function closeRoutePreview() {
   document.body.classList.remove("modal-open");
 }
 
-coachContentElement.addEventListener("click", (event) => {
+window.QiliReviewCoach = {
+  analyzePosition: analyzeReviewPosition,
+  openRoutePreview: openExternalRoutePreview,
+};
+
+coachContentElement?.addEventListener("click", (event) => {
   const button = event.target.closest(".route-preview-trigger");
   if (button) openRoutePreview(button.dataset.route);
 });
@@ -1211,16 +1353,23 @@ routePreviewModalElement?.addEventListener("click", (event) => {
   if (event.target === routePreviewModalElement) closeRoutePreview();
 });
 
-newGameButtonElement.addEventListener("click", resetGame);
-undoStepButtonElement.addEventListener("click", undoOneStep);
-undoButtonElement.addEventListener("click", undoTurn);
-resumeButtonElement.addEventListener("click", resumeAfterUndo);
-flipButtonElement.addEventListener("click", () => {
+newGameButtonElement?.addEventListener("click", resetGame);
+undoStepButtonElement?.addEventListener("click", undoOneStep);
+undoButtonElement?.addEventListener("click", undoTurn);
+resumeButtonElement?.addEventListener("click", resumeAfterUndo);
+flipButtonElement?.addEventListener("click", () => {
   flipped = !flipped;
   renderBoard();
   renderMoveHints();
 });
-analysisToggleElement.addEventListener("change", renderCoach);
+reviewFinishedGameButtonElement?.addEventListener("click", () => {
+  hideGameResult();
+  switchPlatformView("review");
+  void window.QiliIdentity?.loadReviewGames?.();
+});
+rematchButtonElement?.addEventListener("click", resetGame);
+dismissGameResultButtonElement?.addEventListener("click", hideGameResult);
+analysisToggleElement?.addEventListener("change", renderCoach);
 function renderNotationLesson(notation = "车二进四", pieceType = "rook", color = "red") {
   if (!notationBreakdownElement) return;
   const chars = [...notation];
@@ -1274,11 +1423,11 @@ document.querySelectorAll(".notation-example").forEach((button) => {
   });
 });
 
-moveHintsToggleElement.addEventListener("change", () => {
+moveHintsToggleElement?.addEventListener("change", () => {
   if (moveHintsToggleElement.checked) refreshMoveSuggestions();
   else clearMoveSuggestions();
 });
-levelSelectElement.addEventListener("change", () => {
+levelSelectElement?.addEventListener("change", () => {
   if (currentTurn === COLORS.RED && !locked) refreshMoveSuggestions();
 });
 
@@ -1298,18 +1447,38 @@ document.querySelectorAll(".platform-jump").forEach((item) => item.addEventListe
 quickPlayButtonElement?.addEventListener("click", () => switchPlatformView("play"));
 learnNotationButtonElement?.addEventListener("click", openNotationLesson);
 
+const curriculumGridElement = document.querySelector("#learnView .curriculum-grid");
+
+if (curriculumGridElement) {
+  curriculumGridElement.innerHTML = QILI_CURRICULUM_STAGES.map((stage) => {
+    const stageNumber = String(stage.order).padStart(2, "0");
+    return `<button type="button" class="curriculum-card platform-surface curriculum-start" data-stage-id="${stage.id}" data-stage-card="${stage.id}" aria-label="查看阶段 ${stage.order}：${stage.title}">
+      <b>${stageNumber}</b>
+      <h2>${stage.title}</h2>
+      <p>${stage.summary}</p>
+      <span class="curriculum-card-action">查看课程 →</span>
+    </button>`;
+  }).join("");
+}
+
 document.querySelectorAll(".curriculum-start").forEach((button) => {
-  button.addEventListener("click", () => {
-    const level = button.dataset.level;
-    const names = { 16: "规则与走子", 15: "吃子、将军与一步意图", 14: "应将、保护与交换", 13: "两子配合与基础布局" };
-    const lessons = {
-      16: ["棋盘、九宫与河界", "七种棋子的走法", "吃子与将帅照面", "完成合法对局"],
-      15: ["子力价值", "将军与一步杀", "连续吃子", "一步棋的直接意图"],
-      14: ["正确应将", "躲、保、换", "保护强子", "判断交换"],
-      13: ["两子配合", "两步杀", "2–3步计算", "顺炮与列炮"],
-    };
-    curriculumDetailElement.innerHTML = '<div class="curriculum-detail-head"><div><span class="eyebrow">课程预览</span><h2>' + level + '级 · ' + names[level] + '</h2></div></div><div class="lesson-list">' + lessons[level].map((lesson, index) => '<div><span>' + (index + 1) + '</span><strong>' + lesson + '</strong><em>互动练习待接入</em></div>').join('') + '</div>';
+  const stage = QILI_CURRICULUM_STAGES.find((entry) => entry.id === button.dataset.stageId);
+  if (!stage) return;
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    switchPlatformView("learn");
+    document.querySelectorAll("[data-stage-card]").forEach((card) => card.classList.toggle("active", card.dataset.stageCard === stage.id));
+    const lessonRows = stage.lessons.map((lesson, lessonIndex) => `<article class="curriculum-lesson-row">
+      <span>${String(lessonIndex + 1).padStart(2, "0")}</span>
+      <div><strong>${lesson.adultTitle}</strong><p>${lesson.objective}</p></div>
+    </article>`).join("");
+    curriculumDetailElement.innerHTML = `<div class="curriculum-detail-head">
+      <div><span class="eyebrow">阶段 ${String(stage.order).padStart(2, "0")} · ${stage.lessons.length} 课</span><h2>${stage.title}</h2><p>${stage.summary}</p></div>
+    </div>
+    <div class="curriculum-lesson-list">${lessonRows}</div>`;
     curriculumDetailElement.classList.remove("hidden");
+    curriculumDetailElement.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 });
 

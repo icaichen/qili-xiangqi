@@ -1,7 +1,10 @@
+import { ADULT_LEARN_STAGES } from "./xiangqi-teaching-curriculum.mjs";
+
 const rules = window.QiliTutorialRules;
 
 if (rules) {
-  const { ROWS, COLS, COLORS, createEmptyBoard, piece, generatePseudoMoves, applyMove } = rules;
+  const { ROWS, COLS, COLORS, createEmptyBoard, piece, generatePseudoMoves, applyMove, legalMovesForPiece } = rules;
+  const foundationStage = ADULT_LEARN_STAGES.find((stage) => stage.id === "foundation");
 
   const workspace = document.querySelector("#lessonWorkspace");
   const rail = document.querySelector("#lessonStepRail");
@@ -22,6 +25,14 @@ if (rules) {
   const curriculumDetail = document.querySelector("#curriculumDetail");
   const learnView = document.querySelector("#learnView");
   if (workspace && learnView && workspace.parentElement !== learnView) learnView.appendChild(workspace);
+  if (!level16Button) workspace?.setAttribute("hidden", "");
+  const courseMark = workspace?.querySelector(".lesson-course-mark");
+  const courseTitle = workspace?.querySelector(".lesson-sidebar h2");
+  if (courseMark) {
+    courseMark.querySelector("span").textContent = "STAGE";
+    courseMark.querySelector("strong").textContent = "01";
+  }
+  if (courseTitle && foundationStage) courseTitle.textContent = foundationStage.title;
 
   const STEPS = [
     {
@@ -127,6 +138,10 @@ if (rules) {
     (step.pieces || []).forEach(([row, col, type, color]) => {
       next[row][col] = piece(type, color);
     });
+    if (step.mode === "moves") {
+      if (!next.flat().some((entry) => entry?.type === "general" && entry.color === COLORS.RED)) next[9][4] = piece("general", COLORS.RED);
+      if (!next.flat().some((entry) => entry?.type === "general" && entry.color === COLORS.BLACK)) next[0][3] = piece("general", COLORS.BLACK);
+    }
     return next;
   }
 
@@ -276,7 +291,7 @@ if (rules) {
         return;
       }
       state.selected = { row, col };
-      state.legal = generatePseudoMoves(state.board, row, col);
+      state.legal = legalMovesForPiece(state.board, row, col);
       setMessage("neutral", "已经选中", "现在选择正确落点。高亮位置是这枚棋子当前规则允许的落点。");
       render();
       return;
@@ -312,7 +327,7 @@ if (rules) {
     state.legal = [];
 
     if (state.moveIndex >= step.expectedMoves.length) {
-      markComplete(step.quiz ? "两手都正确。16级规则与走子课程完成。" : "走对了。这个规则你已经亲手验证过。" );
+      markComplete(step.quiz ? "两手都正确。阶段 1 的规则与走子课程完成。" : "走对了。这个规则你已经亲手验证过。" );
     } else {
       setMessage("success", "第一步正确", "继续完成这一节的下一手。");
     }
@@ -348,7 +363,7 @@ if (rules) {
       loadStep(state.stepIndex + 1);
       return;
     }
-    setMessage("success", "16级完成", "你已经掌握棋盘边界和七种棋子的基础走法。下一步可以进入15级：吃子、将军与一步意图。");
+    setMessage("success", "阶段 1 完成", "你已经掌握棋盘边界和七种棋子的基础走法。下一阶段：吃子、将军与一步意图。");
     render();
   });
   resetButton?.addEventListener("click", resetStep);

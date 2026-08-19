@@ -12,8 +12,8 @@
     <link rel="stylesheet" href="/redesign.css" />
     <link rel="stylesheet" href="/brand-v2.css" />
     <link rel="stylesheet" href="/online.css" />
-    <link rel="stylesheet" href="/tutorial.css" />
     <link rel="stylesheet" href="/kids.css" />
+    <link rel="stylesheet" href="/analysis.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -179,6 +179,24 @@
             </svg>
             <svg id="moveHints" class="move-hints" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true"></svg>
             <div id="boardPoints" class="board-points"></div>
+            <div id="gameResultOverlay" class="game-result-overlay hidden" role="dialog" aria-live="assertive" aria-labelledby="gameResultTitle">
+              <div class="game-result-card">
+                <span class="game-result-kicker">对局结束</span>
+                <div id="gameResultMark" class="game-result-mark">负</div>
+                <h2 id="gameResultTitle">本局落败</h2>
+                <p id="gameResultReason" class="game-result-reason">被将死</p>
+                <div class="game-result-meta">
+                  <div><span>对手</span><strong id="gameResultOpponent">Pikafish</strong></div>
+                  <div><span>手数</span><strong id="gameResultMoves">0 手</strong></div>
+                </div>
+                <p class="game-result-saved">棋谱已保存，可以直接复盘。</p>
+                <div class="game-result-actions">
+                  <button id="reviewFinishedGameButton" class="button button-primary">复盘这盘</button>
+                  <button id="rematchButton" class="button button-secondary">再来一局</button>
+                </div>
+                <button id="dismissGameResultButton" class="game-result-dismiss" type="button">查看最终局面</button>
+              </div>
+            </div>
           </div>
 
           <div class="board-footer">
@@ -355,8 +373,7 @@
         </div>
       </section>
 
-      <section id="learnView" class="platform-view platform-page hidden"><div class="platform-page-header"><div><span class="eyebrow">LEARN</span><h1>学习中国象棋</h1><p>按照初学者真正需要掌握的顺序学习。</p></div><button class="button button-ghost" id="learnNotationButton">先学记谱</button></div><div class="curriculum-grid"><article class="curriculum-card platform-surface"><b>16</b><h2>规则与走子</h2><p>棋盘、九宫、河界、棋子走法、吃子和将帅照面。</p><button class="button button-primary curriculum-start" data-level="16">查看课程</button></article><article class="curriculum-card platform-surface"><b>15</b><h2>吃子、将军与一步意图</h2><p>子力价值、将军、一步杀、连续吃子。</p><button class="button button-ghost curriculum-start" data-level="15">查看课程</button></article><article class="curriculum-card platform-surface"><b>14</b><h2>应将、保护与交换</h2><p>躲、保、换，避免强子损失。</p><button class="button button-ghost curriculum-start" data-level="14">查看课程</button></article><article class="curriculum-card platform-surface"><b>13</b><h2>两子配合与基础布局</h2><p>两子配合、2–3步计算、顺炮和列炮。</p><button class="button button-ghost curriculum-start" data-level="13">查看课程</button></article></div><div id="curriculumDetail" class="platform-surface curriculum-detail hidden"></div></section>
-      <section id="lessonWorkspace" class="lesson-workspace platform-surface hidden" aria-live="polite"><aside class="lesson-sidebar"><div class="lesson-course-mark"><span>LEVEL</span><strong>16</strong></div><div><span class="eyebrow">互动课程</span><h2>规则与走子</h2></div><div class="lesson-progress"><div><span id="lessonProgressText">1 / 8</span><small>课程进度</small></div><div class="lesson-progress-track"><i id="lessonProgressFill"></i></div></div><div id="lessonStepRail" class="lesson-step-rail"></div></aside><section class="lesson-stage"><header class="lesson-stage-head"><div><span class="eyebrow" id="lessonKicker">第 1 课</span><h2 id="lessonTitle">认识棋盘</h2><p id="lessonInstruction">按照提示完成棋盘任务。</p></div><button id="lessonReset" class="button button-ghost">重做本节</button></header><div class="lesson-stage-grid"><div class="lesson-board-shell"><div id="lessonBoard" class="lesson-board" aria-label="互动教学棋盘"></div><div id="lessonFeedback" class="lesson-feedback neutral"><strong>轮到你</strong><span>按照提示在棋盘上完成任务。</span></div></div><aside class="lesson-teaching-card"><span class="eyebrow">只记这一点</span><h3 id="lessonHintTitle">棋子落在交叉点</h3><p id="lessonHint">先完成棋盘任务，再进入下一节。</p><div id="lessonRuleChips" class="lesson-rule-chips"></div></aside></div><footer class="lesson-stage-actions"><button id="lessonPrev" class="button button-ghost">上一节</button><button id="lessonNext" class="button button-primary" disabled>完成后继续</button></footer></section></section>
+      <section id="learnView" class="platform-view platform-page hidden"><div class="platform-page-header"><div><span class="eyebrow">LEARN</span><h1>学习中国象棋</h1><p>按照初学者真正需要掌握的顺序学习。</p></div><button class="button button-ghost" id="learnNotationButton">先学记谱</button></div><div class="curriculum-grid"></div><div id="curriculumDetail" class="platform-surface curriculum-detail hidden"></div></section>
 
       <section id="reviewDropzone" class="review-dropzone platform-view hidden">
         <div class="drop-icon">谱</div>
@@ -364,13 +381,7 @@
         <p>第一阶段将支持粘贴中国象棋 PGN、手动摆盘和上传棋谱文件。</p>
         <button class="button button-primary" disabled>即将开放</button>
       </section>
-      <section id="analysisView" class="platform-view platform-page hidden">
-        <div class="platform-page-header"><div><span class="eyebrow">ANALYSIS · 棋盘分析</span><h1>把任何局面放上来研究</h1><p>自由摆盘、FEN、候选着与 Pikafish 主变化会集中在这里。</p></div><span>下一阶段</span></div>
-        <div class="analysis-layout">
-          <section class="platform-surface analysis-board-shell"><div class="analysis-placeholder-board"><span>车</span><span>马</span><span>炮</span><span class="red-chip">帅</span></div><p>自由摆盘棋盘</p></section>
-          <aside class="platform-surface analysis-side"><span class="eyebrow">分析工具</span><h2>Pikafish</h2><div class="analysis-option"><span>局面来源</span><strong>手动摆盘 / FEN</strong></div><div class="analysis-option"><span>候选路线</span><strong>MultiPV 1–5</strong></div><div class="analysis-option"><span>教学解释</span><strong>可验证证据 + AI</strong></div><button class="button button-primary" disabled>自由分析即将开放</button></aside>
-        </div>
-      </section>
+      <section id="analysisView" class="platform-view platform-page hidden"></section>
       <section id="profileView" class="platform-view platform-page hidden">
         <div class="platform-page-header"><div><span class="eyebrow">PROFILE · 我的</span><h1>你的棋手档案</h1><p>游客可以直接下棋；登录后，历史棋局与 Rapid / Blitz Rating 可以在其他设备恢复。</p></div><span id="profileAccountStatus">正在建立棋手身份…</span></div>
         <div class="profile-grid">
@@ -464,6 +475,7 @@
     <script type="module" src="/engine-client.js"></script>
     <script type="module" src="/coach-tools.js"></script>
     <script type="module" src="/app.js"></script>
+    <script type="module" src="/analysis-client.js"></script>
     <script type="module" src="/tutorial-client.js"></script>
     <script type="module" src="/kids-client.js"></script>
     <script type="module" src="/auth-client.js"></script>
