@@ -7,6 +7,8 @@ import {
   claimClerkUser,
   updateUserDisplayName,
   getRatingsForUser,
+  getComputerRatings,
+  recordComputerCalibration,
   listGamesForUser,
   initializePersistence,
   persistenceInfo,
@@ -133,6 +135,11 @@ async function handleIdentityRequest(request, response) {
       throw Object.assign(new Error(message), { statusCode: 503 });
     }
 
+    if (request.method === "GET" && url.pathname === "/api/identity/computer-levels") {
+      json(response, 200, { levels: await getComputerRatings() });
+      return true;
+    }
+
     if (request.method === "POST" && url.pathname === "/api/auth/claim") {
       if (!clerkConfig().enabled) throw Object.assign(new Error("Registered login is not configured"), { statusCode: 503 });
       const sessionToken = bearerToken(request);
@@ -173,6 +180,20 @@ async function handleIdentityRequest(request, response) {
     if (request.method === "GET" && url.pathname === "/api/identity/me") {
       const user = await requireAccount(request);
       json(response, 200, { user, ratings: await ratingsFor(user.id) });
+      return true;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/identity/me/computer-result") {
+      const user = await requireAccount(request);
+      const body = await readJson(request);
+      const gameId = String(body.gameId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100);
+      const level = String(body.level || "").slice(0, 12);
+      const winner = body.winner == null ? null : String(body.winner);
+      if (!gameId || !["red", "black", null].includes(winner)) {
+        throw Object.assign(new Error("Invalid computer game result"), { statusCode: 400 });
+      }
+      const calibration = await recordComputerCalibration({ gameId, userId: user.id, level, winner });
+      json(response, 200, { calibration, levels: await getComputerRatings() });
       return true;
     }
 

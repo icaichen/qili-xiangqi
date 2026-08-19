@@ -702,18 +702,35 @@ function createComputerGameId() {
   return window.crypto?.randomUUID?.() || `computer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function computerOpponentInfo(levelValue = levelSelectElement?.value) {
+  const level = String(levelValue || "1400");
+  const info = window.QiliIdentity?.getComputerLevels?.()?.[level] || null;
+  const rating = Number(info?.rating ?? (level === "max" ? 2200 : level));
+  const calibration = info?.calibrated ? "" : " · 校准中";
+  const strength = level === "max" ? " · 最高强度" : "";
+  return { level, info, label: `Pikafish · Qili ${rating}${strength}${calibration}` };
+}
+
 function saveComputerGameToHistory(result) {
   if (!history.length) return;
-  const level = String(levelSelectElement?.value || "1400");
+  const opponentInfo = computerOpponentInfo();
+  const { level, info } = opponentInfo;
   const record = {
     id: computerGameId,
     source: "computer",
     createdAt: computerGameStartedAt,
     startedAt: computerGameStartedAt,
     finishedAt: Date.now(),
-    timeControl: { mode: "computer", level, label: `Pikafish · ${level}` },
+    timeControl: {
+      mode: "computer",
+      level,
+      label: opponentInfo.label,
+      qiliRating: info?.rating ?? (level === "max" ? 2200 : Number(level)),
+      ratingDeviation: info?.deviation ?? null,
+      calibrated: Boolean(info?.calibrated),
+    },
     color: "red",
-    opponent: `Pikafish · ${level}`,
+    opponent: opponentInfo.label,
     result,
     moves: history.map((entry, index) => ({
       ply: index + 1,
@@ -751,8 +768,7 @@ function showGameResult(result) {
   if (!gameResultOverlayElement) return;
   const didWin = result?.winner === COLORS.RED;
   const isDraw = !result?.winner;
-  const level = String(levelSelectElement?.value || "1200");
-  const opponent = level === "max" ? "Pikafish · 全力" : "Pikafish · " + level;
+  const opponent = computerOpponentInfo().label;
   gameResultOverlayElement.classList.remove("hidden", "win", "loss", "draw");
   gameResultOverlayElement.classList.add(isDraw ? "draw" : didWin ? "win" : "loss");
   if (gameResultMarkElement) gameResultMarkElement.textContent = isDraw ? "和" : didWin ? "胜" : "负";

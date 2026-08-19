@@ -70,18 +70,18 @@
               <span id="gameStatusBadge" class="status-badge">红方走棋</span>
             </div>
 
-            <label class="field-label" for="levelSelect">估算训练棋力</label>
+            <label class="field-label" for="levelSelect">电脑 Qili 棋力</label>
             <select id="levelSelect" class="select-control">
-              <option value="800">800 · 刚入门</option>
-              <option value="1000">1000 · 基础对弈</option>
-              <option value="1200" selected>1200 · 常见战术</option>
-              <option value="1400">1400 · 稳定业余</option>
-              <option value="1600">1600 · 较强业余</option>
-              <option value="1800">1800 · 高水平业余</option>
-              <option value="2000">2000 · 接近强手</option>
-              <option value="max">无限制 · Pikafish全力</option>
+              <option value="800">Qili 800 · 入门 · 校准中</option>
+              <option value="1000">Qili 1000 · 基础 · 校准中</option>
+              <option value="1200">Qili 1200 · 进阶入门 · 校准中</option>
+              <option value="1400" selected>Qili 1400 · 稳定业余 · 校准中</option>
+              <option value="1600">Qili 1600 · 较强业余 · 校准中</option>
+              <option value="1800">Qili 1800 · 高水平业余 · 校准中</option>
+              <option value="2000">Qili 2000 · 强手 · 校准中</option>
+              <option value="max">Qili 2200 · 最高强度 · 校准中</option>
             </select>
-            <p class="level-note">这是训练用估算等级，不等同于天天象棋或其他平台积分。</p>
+            <p class="level-note">电脑 Qili 分会随真实对局持续校准；电脑局不会改变你的真人 Qili 分。</p>
             <button id="openOnlinePlayButton" class="button button-primary action-wide online-entry-button">真人在线对弈</button>
 
             <div class="analysis-toggle-row">
@@ -402,8 +402,8 @@
               <small id="profileAuthStatus">正在检查登录服务…</small>
             </div>
           </article>
-          <article class="platform-surface profile-stat rating-stat"><span>Rapid</span><strong id="profileRapidRating">1200</strong><small id="profileRapidMeta">初始 1200 · 尚无定级对局</small></article>
-          <article class="platform-surface profile-stat rating-stat"><span>Blitz</span><strong id="profileBlitzRating">1200</strong><small id="profileBlitzMeta">初始 1200 · 尚无定级对局</small></article>
+          <article class="platform-surface profile-stat rating-stat"><span>Rapid · Qili</span><strong id="profileRapidRating">1500</strong><small id="profileRapidMeta">Qili 初始 1500 · 定级中</small></article>
+          <article class="platform-surface profile-stat rating-stat"><span>Blitz · Qili</span><strong id="profileBlitzRating">1500</strong><small id="profileBlitzMeta">Qili 初始 1500 · 定级中</small></article>
           <article class="platform-surface profile-stat"><span>完成真人对局</span><strong id="profileGameCount">0</strong><small>来自永久棋谱数据库</small></article>
           <article class="platform-surface ability-card"><div><span class="eyebrow">能力画像</span><h2>不是一个总分，而是六项能力</h2></div><div class="ability-empty"><span>将军识别</span><span>吃子判断</span><span>保护意识</span><span>交换判断</span><span>杀法计算</span><span>布局基础</span></div><p>有足够真实对局后才显示能力百分比，不使用虚构数据。</p></article>
           <article class="platform-surface recent-games-card profile-history-card">

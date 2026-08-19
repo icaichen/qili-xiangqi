@@ -1,10 +1,19 @@
 import { createClient } from "redis";
 import pg from "pg";
+import {
+  QILI_RATING_DEFAULT,
+  QILI_RD_DEFAULT,
+  QILI_VOLATILITY_DEFAULT,
+  COMPUTER_LEVEL_SEEDS,
+  publicRatingRecord,
+  updateGlicko2,
+  inflateRatingForInactivity,
+} from "./qili-rating.mjs";
+import { loadComputerRatings, recordComputerCalibration as updateComputerCalibration } from "./qili-bot-calibration.mjs";
 
 const { Pool } = pg;
 const ROOM_PREFIX = "qili:room:";
 const TICKETS_KEY = "qili:matchmaking:tickets";
-const DEFAULT_RATING = 1200;
 
 let redisClient = null;
 let pgPool = null;
@@ -35,7 +44,16 @@ function ratingPoolForTimeControl(timeControl) {
 }
 
 function emptyRating(pool) {
-  return { pool, rating: DEFAULT_RATING, games: 0, wins: 0, draws: 0, losses: 0 };
+  return publicRatingRecord({
+    pool,
+    rating: QILI_RATING_DEFAULT,
+    deviation: QILI_RD_DEFAULT,
+    volatility: QILI_VOLATILITY_DEFAULT,
+    games: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+  }, pool);
 }
 
 async function initializePersistence() {
@@ -97,11 +115,16 @@ async function initializePersistence() {
       await pgPool.query("ALTER TABLE online_games ADD COLUMN IF NOT EXISTS red_user_id TEXT REFERENCES qili_users(id) ON DELETE SET NULL");
       await pgPool.query("ALTER TABLE online_games ADD COLUMN IF NOT EXISTS black_user_id TEXT REFERENCES qili_users(id) ON DELETE SET NULL");
 
+      await pgPool.query("CREATE TABLE IF NOT EXISTS qili_meta (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+
       await pgPool.query(`
         CREATE TABLE IF NOT EXISTS qili_ratings (
           user_id TEXT NOT NULL REFERENCES qili_users(id) ON DELETE CASCADE,
           pool TEXT NOT NULL CHECK (pool IN ('rapid', 'blitz')),
-          rating INTEGER NOT NULL DEFAULT 1200,
+          rating INTEGER NOT NULL DEFAULT 1500,
+          deviation DOUBLE PRECISION NOT NULL DEFAULT 350,
+          volatility DOUBLE PRECISION NOT NULL DEFAULT 0.06,
+          last_rated_at TIMESTAMPTZ,
           games INTEGER NOT NULL DEFAULT 0,
           wins INTEGER NOT NULL DEFAULT 0,
           draws INTEGER NOT NULL DEFAULT 0,
@@ -110,6 +133,10 @@ async function initializePersistence() {
           PRIMARY KEY (user_id, pool)
         )
       `);
+      await pgPool.query("ALTER TABLE qili_ratings ADD COLUMN IF NOT EXISTS deviation DOUBLE PRECISION NOT NULL DEFAULT 350");
+      await pgPool.query("ALTER TABLE qili_ratings ADD COLUMN IF NOT EXISTS volatility DOUBLE PRECISION NOT NULL DEFAULT 0.06");
+      await pgPool.query("ALTER TABLE qili_ratings ADD COLUMN IF NOT EXISTS last_rated_at TIMESTAMPTZ");
+      await pgPool.query("ALTER TABLE qili_ratings ALTER COLUMN rating SET DEFAULT 1500");
 
       await pgPool.query(`
         CREATE TABLE IF NOT EXISTS rating_events (
@@ -121,9 +148,71 @@ async function initializePersistence() {
           red_after INTEGER NOT NULL,
           black_before INTEGER NOT NULL,
           black_after INTEGER NOT NULL,
+          red_rd_before DOUBLE PRECISION,
+          red_rd_after DOUBLE PRECISION,
+          black_rd_before DOUBLE PRECISION,
+          black_rd_after DOUBLE PRECISION,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
+      await pgPool.query("ALTER TABLE rating_events ADD COLUMN IF NOT EXISTS red_rd_before DOUBLE PRECISION");
+      await pgPool.query("ALTER TABLE rating_events ADD COLUMN IF NOT EXISTS red_rd_after DOUBLE PRECISION");
+      await pgPool.query("ALTER TABLE rating_events ADD COLUMN IF NOT EXISTS black_rd_before DOUBLE PRECISION");
+      await pgPool.query("ALTER TABLE rating_events ADD COLUMN IF NOT EXISTS black_rd_after DOUBLE PRECISION");
+
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS qili_bot_ratings (
+          level_id TEXT PRIMARY KEY,
+          rating INTEGER NOT NULL,
+          deviation DOUBLE PRECISION NOT NULL DEFAULT 350,
+          volatility DOUBLE PRECISION NOT NULL DEFAULT 0.06,
+          games INTEGER NOT NULL DEFAULT 0,
+          wins INTEGER NOT NULL DEFAULT 0,
+          draws INTEGER NOT NULL DEFAULT 0,
+          losses INTEGER NOT NULL DEFAULT 0,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS qili_bot_rating_events (
+          game_id TEXT PRIMARY KEY,
+          level_id TEXT NOT NULL REFERENCES qili_bot_ratings(level_id) ON DELETE CASCADE,
+          user_id TEXT NOT NULL REFERENCES qili_users(id) ON DELETE CASCADE,
+          user_rating INTEGER NOT NULL,
+          user_deviation DOUBLE PRECISION NOT NULL,
+          score DOUBLE PRECISION NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+
+      for (const [levelId, seed] of Object.entries(COMPUTER_LEVEL_SEEDS)) {
+        await pgPool.query(
+          `INSERT INTO qili_bot_ratings (level_id, rating, deviation, volatility)
+           VALUES ($1, $2, $3, $4) ON CONFLICT (level_id) DO NOTHING`,
+          [levelId, seed.rating, QILI_RD_DEFAULT, QILI_VOLATILITY_DEFAULT],
+        );
+      }
+
+      const scaleMigration = await pgPool.query("SELECT key FROM qili_meta WHERE key = 'glicko2-scale-1500-v1' LIMIT 1");
+      if (!scaleMigration.rows.length) {
+        const migrationClient = await pgPool.connect();
+        try {
+          await migrationClient.query("BEGIN");
+          await migrationClient.query("UPDATE qili_ratings SET rating = rating + 300");
+          await migrationClient.query("UPDATE rating_events SET red_before = red_before + 300, red_after = red_after + 300, black_before = black_before + 300, black_after = black_after + 300");
+          await migrationClient.query(
+            "INSERT INTO qili_meta (key, value) VALUES ('glicko2-scale-1500-v1', $1::jsonb)",
+            [JSON.stringify({ migratedAt: new Date().toISOString(), offset: 300 })],
+          );
+          await migrationClient.query("COMMIT");
+        } catch (error) {
+          await migrationClient.query("ROLLBACK").catch(() => {});
+          throw error;
+        } finally {
+          migrationClient.release();
+        }
+      }
 
       await pgPool.query("CREATE INDEX IF NOT EXISTS online_games_finished_at_idx ON online_games (finished_at DESC)");
       await pgPool.query("CREATE INDEX IF NOT EXISTS online_games_red_user_idx ON online_games (red_user_id, finished_at DESC)");
@@ -234,22 +323,26 @@ async function getRatingsForUser(userId) {
   const ratings = { rapid: emptyRating("rapid"), blitz: emptyRating("blitz") };
   if (!state.postgresReady || !pgPool || !userId) return ratings;
   const result = await pgPool.query(
-    `SELECT pool, rating, games, wins, draws, losses
+    `SELECT pool, rating, deviation, volatility, last_rated_at, games, wins, draws, losses
        FROM qili_ratings WHERE user_id = $1`,
     [userId],
   );
   for (const row of result.rows) {
     if (!ratings[row.pool]) continue;
-    ratings[row.pool] = {
-      pool: row.pool,
-      rating: Number(row.rating),
-      games: Number(row.games),
-      wins: Number(row.wins),
-      draws: Number(row.draws),
-      losses: Number(row.losses),
-    };
+    const current = inflateRatingForInactivity(row, row.last_rated_at);
+    ratings[row.pool] = publicRatingRecord({ ...row, ...current }, row.pool);
+    ratings[row.pool].lastRatedAt = row.last_rated_at || null;
   }
   return ratings;
+}
+
+async function getComputerRatings() {
+  return loadComputerRatings(state.postgresReady ? pgPool : null);
+}
+
+async function recordComputerCalibration(payload) {
+  if (!state.postgresReady || !pgPool) return { accepted: false, reason: "persistence-unavailable" };
+  return updateComputerCalibration(pgPool, payload);
 }
 
 async function listGamesForUser(userId, limit = 20) {
@@ -351,14 +444,6 @@ async function loadTickets() {
   }
 }
 
-function expectedScore(ratingA, ratingB) {
-  return 1 / (1 + (10 ** ((ratingB - ratingA) / 400)));
-}
-
-function kFactor(games) {
-  return Number(games || 0) < 20 ? 40 : 24;
-}
-
 async function applyRatingForFinishedGame(room) {
   const redUserId = room.players?.red?.userId || null;
   const blackUserId = room.players?.black?.userId || null;
@@ -381,7 +466,7 @@ async function applyRatingForFinishedGame(room) {
     );
 
     const current = await client.query(
-      `SELECT user_id, rating, games, wins, draws, losses
+      `SELECT user_id, rating, deviation, volatility, last_rated_at, games, wins, draws, losses
          FROM qili_ratings
         WHERE pool = $1 AND user_id = ANY($2::text[])
         FOR UPDATE`,
@@ -391,44 +476,56 @@ async function applyRatingForFinishedGame(room) {
     const black = current.rows.find((row) => row.user_id === blackUserId);
     if (!red || !black) throw new Error("Could not lock rating rows");
 
-    const redBefore = Number(red.rating);
-    const blackBefore = Number(black.rating);
+    const redCurrent = { ...red, ...inflateRatingForInactivity(red, red.last_rated_at) };
+    const blackCurrent = { ...black, ...inflateRatingForInactivity(black, black.last_rated_at) };
+    const redBefore = Number(redCurrent.rating);
+    const blackBefore = Number(blackCurrent.rating);
     const winner = room.result?.winner || null;
     const redScore = winner === "red" ? 1 : winner === "black" ? 0 : 0.5;
     const blackScore = 1 - redScore;
-    const redAfter = Math.max(100, Math.round(redBefore + kFactor(red.games) * (redScore - expectedScore(redBefore, blackBefore))));
-    const blackAfter = Math.max(100, Math.round(blackBefore + kFactor(black.games) * (blackScore - expectedScore(blackBefore, redBefore))));
+    const redNext = updateGlicko2(redCurrent, [{ score: redScore, opponent: blackCurrent }]);
+    const blackNext = updateGlicko2(blackCurrent, [{ score: blackScore, opponent: redCurrent }]);
+    const redAfter = Math.round(redNext.rating);
+    const blackAfter = Math.round(blackNext.rating);
     const isDraw = winner == null;
 
     await client.query(
       `UPDATE qili_ratings
           SET rating = $3,
+              deviation = $4,
+              volatility = $5,
+              last_rated_at = NOW(),
               games = games + 1,
-              wins = wins + $4,
-              draws = draws + $5,
-              losses = losses + $6,
+              wins = wins + $6,
+              draws = draws + $7,
+              losses = losses + $8,
               updated_at = NOW()
         WHERE user_id = $1 AND pool = $2`,
-      [redUserId, pool, redAfter, redScore === 1 ? 1 : 0, isDraw ? 1 : 0, redScore === 0 ? 1 : 0],
+      [redUserId, pool, redAfter, redNext.deviation, redNext.volatility, redScore === 1 ? 1 : 0, isDraw ? 1 : 0, redScore === 0 ? 1 : 0],
     );
     await client.query(
       `UPDATE qili_ratings
           SET rating = $3,
+              deviation = $4,
+              volatility = $5,
+              last_rated_at = NOW(),
               games = games + 1,
-              wins = wins + $4,
-              draws = draws + $5,
-              losses = losses + $6,
+              wins = wins + $6,
+              draws = draws + $7,
+              losses = losses + $8,
               updated_at = NOW()
         WHERE user_id = $1 AND pool = $2`,
-      [blackUserId, pool, blackAfter, blackScore === 1 ? 1 : 0, isDraw ? 1 : 0, blackScore === 0 ? 1 : 0],
+      [blackUserId, pool, blackAfter, blackNext.deviation, blackNext.volatility, blackScore === 1 ? 1 : 0, isDraw ? 1 : 0, blackScore === 0 ? 1 : 0],
     );
 
     await client.query(
       `INSERT INTO rating_events (
          game_id, pool, red_user_id, black_user_id,
-         red_before, red_after, black_before, black_after
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [room.id, pool, redUserId, blackUserId, redBefore, redAfter, blackBefore, blackAfter],
+         red_before, red_after, black_before, black_after,
+         red_rd_before, red_rd_after, black_rd_before, black_rd_after
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+      [room.id, pool, redUserId, blackUserId, redBefore, redAfter, blackBefore, blackAfter,
+        Number(redCurrent.deviation), redNext.deviation, Number(blackCurrent.deviation), blackNext.deviation],
     );
 
     await client.query("COMMIT");
@@ -525,6 +622,8 @@ export {
   claimClerkUser,
   updateUserDisplayName,
   getRatingsForUser,
+  getComputerRatings,
+  recordComputerCalibration,
   listGamesForUser,
   saveRoom,
   loadRooms,

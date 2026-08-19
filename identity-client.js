@@ -14,6 +14,7 @@ let bootPromise = null;
 let historyLoading = false;
 let registeredClaimed = false;
 let reviewShellReady = false;
+let computerLevels = {};
 let reviewGames = [];
 let activeReviewGame = null;
 let activeReviewAnalysis = null;
@@ -69,7 +70,11 @@ async function apiRequest(path, options = {}, includeAuth = true) {
 }
 
 function ratingRecord(pool) {
-  return account?.ratings?.[pool] || { rating: 1200, games: 0, wins: 0, draws: 0, losses: 0 };
+  return account?.ratings?.[pool] || {
+    rating: 1500, deviation: 350, volatility: 0.06,
+    games: 0, wins: 0, draws: 0, losses: 0,
+    provisional: true, stability: "低",
+  };
 }
 
 function renderRatings() {
@@ -79,10 +84,59 @@ function renderRatings() {
   const blitzEl = document.querySelector("#profileBlitzRating");
   const rapidMeta = document.querySelector("#profileRapidMeta");
   const blitzMeta = document.querySelector("#profileBlitzMeta");
-  if (rapidEl) rapidEl.textContent = String(rapid.rating ?? 1200);
-  if (blitzEl) blitzEl.textContent = String(blitz.rating ?? 1200);
-  if (rapidMeta) rapidMeta.textContent = rapid.games ? `${rapid.games} 局 · ${rapid.wins}胜 ${rapid.draws}和 ${rapid.losses}负` : "初始 1200 · 尚无定级对局";
-  if (blitzMeta) blitzMeta.textContent = blitz.games ? `${blitz.games} 局 · ${blitz.wins}胜 ${blitz.draws}和 ${blitz.losses}负` : "初始 1200 · 尚无定级对局";
+  if (rapidEl) rapidEl.textContent = String(rapid.rating ?? 1500);
+  if (blitzEl) blitzEl.textContent = String(blitz.rating ?? 1500);
+  const rapidState = rapid.provisional ? "定级中" : `稳定度${rapid.stability || "高"}`;
+  const blitzState = blitz.provisional ? "定级中" : `稳定度${blitz.stability || "高"}`;
+  if (rapidMeta) rapidMeta.textContent = rapid.games ? `${rapidState} · ${rapid.games} 局 · ${rapid.wins}胜 ${rapid.draws}和 ${rapid.losses}负` : "Qili 初始 1500 · 定级中";
+  if (blitzMeta) blitzMeta.textContent = blitz.games ? `${blitzState} · ${blitz.games} 局 · ${blitz.wins}胜 ${blitz.draws}和 ${blitz.losses}负` : "Qili 初始 1500 · 定级中";
+}
+
+function renderComputerLevels() {
+  const select = document.querySelector("#levelSelect");
+  if (!select) return;
+  for (const option of select.options) {
+    const info = computerLevels?.[option.value];
+    if (!info) continue;
+    if (info.unbounded) {
+      option.textContent = info.calibrated ? `全力 · Qili ${info.rating}+` : "全力 · 超出当前校准范围";
+    } else {
+      option.textContent = `Qili ${info.rating} · ${info.label}${info.calibrated ? "" : " · 校准中"}`;
+    }
+  }
+  const note = document.querySelector(".level-note");
+  if (note) note.textContent = "电脑 Qili 分会随真实对局持续校准；校准中的数字仍带较高不确定度。电脑局不会改变你的真人 Qili 分。";
+}
+
+async function loadComputerLevels() {
+  try {
+    const payload = await apiRequest("/api/identity/computer-levels", {}, false);
+    computerLevels = payload.levels || {};
+    renderComputerLevels();
+  } catch (error) {
+    console.warn("[computer-levels]", error);
+  }
+  return computerLevels;
+}
+
+function getComputerLevels() {
+  return computerLevels;
+}
+
+async function reportComputerResult(game) {
+  if (!game?.id || game.source !== "computer") return null;
+  await ensureIdentity();
+  const payload = await apiRequest("/api/identity/me/computer-result", {
+    method: "POST",
+    body: JSON.stringify({
+      gameId: game.id,
+      level: game.timeControl?.level,
+      winner: game.result?.winner ?? null,
+    }),
+  });
+  computerLevels = payload.levels || computerLevels;
+  renderComputerLevels();
+  return payload.calibration || null;
 }
 
 function renderAuthControls() {
@@ -104,7 +158,7 @@ function renderAuthControls() {
       const email = window.QiliAuth?.getPrimaryEmail?.();
       status.textContent = email ? `已登录 · ${email}` : "正式账户已登录，可在其他设备恢复。";
     } else {
-      status.textContent = "登录后可在其他设备恢复历史棋局和 Rating。";
+      status.textContent = "登录后可在其他设备恢复历史棋局和 Qili 棋力分。";
     }
   }
 }
@@ -127,8 +181,8 @@ function renderIdentity() {
   const profileIdentityNote = document.querySelector("#profileIdentityNote");
   if (profileIdentityNote) {
     profileIdentityNote.textContent = registered
-      ? "历史棋局与 Rating 已绑定正式账户。退出后可再次通过邮箱、Google 或 Passkey 恢复。"
-      : "游客身份只保存在当前浏览器。登录时会把当前历史棋局和 Rating 原地认领到正式账户。";
+      ? "历史棋局与 Qili 棋力分已绑定正式账户。退出后可再次通过邮箱、Google 或 Passkey 恢复。"
+      : "游客身份只保存在当前浏览器。登录时会把当前历史棋局和 Qili 棋力分原地认领到正式账户。";
   }
 
   const profileNameInput = document.querySelector("#profileNameInput");
@@ -1735,7 +1789,10 @@ document.querySelectorAll('[data-view="review"], [data-target-view="review"]').f
   button.addEventListener("click", () => void loadReviewGames());
 });
 
-window.addEventListener("qili-game-finished", () => {
+window.addEventListener("qili-game-finished", (event) => {
+  if (event.detail?.source === "computer" && event.detail?.game) {
+    void reportComputerResult(event.detail.game).catch((error) => console.warn("[computer-calibration]", error));
+  }
   void loadHistory();
   if (!document.querySelector("#reviewDropzone")?.classList.contains("hidden")) void loadReviewGames();
 });
@@ -1770,10 +1827,13 @@ window.QiliIdentity = {
   getAuthToken,
   getUser,
   getRatings,
+  loadComputerLevels,
+  getComputerLevels,
 };
 
 prepareReviewShell();
 renderIdentity();
+void loadComputerLevels();
 if (window.location.hash === "#review") void loadReviewGames();
 void ensureIdentity().then(() => {
   void loadHistory();

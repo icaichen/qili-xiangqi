@@ -26,7 +26,8 @@ const black = await request("/api/identity/guest", {
   body: JSON.stringify({ displayName: "Rating测试黑" }),
 });
 
-if (red.ratings?.rapid?.rating !== 1200 || black.ratings?.rapid?.rating !== 1200) throw new Error("New account Rapid rating is not 1200");
+if (red.ratings?.rapid?.rating !== 1500 || black.ratings?.rapid?.rating !== 1500) throw new Error("New account Rapid Qili rating is not 1500");
+if (!red.ratings?.rapid?.provisional || !black.ratings?.rapid?.provisional) throw new Error("New account should be provisional");
 
 const created = await request("/api/online/rooms", {
   method: "POST",
@@ -65,18 +66,19 @@ const blackHistory = await request("/api/identity/me/games?limit=5", {}, black.a
 const redGame = redHistory.games.find((game) => game.id === created.room.id);
 const blackGame = blackHistory.games.find((game) => game.id === created.room.id);
 
-if (redMe.ratings?.rapid?.rating !== 1180) throw new Error(`Expected red 1180, got ${redMe.ratings?.rapid?.rating}`);
-if (blackMe.ratings?.rapid?.rating !== 1220) throw new Error(`Expected black 1220, got ${blackMe.ratings?.rapid?.rating}`);
+if (redMe.ratings?.rapid?.rating !== 1338) throw new Error(`Expected red 1338, got ${redMe.ratings?.rapid?.rating}`);
+if (blackMe.ratings?.rapid?.rating !== 1662) throw new Error(`Expected black 1662, got ${blackMe.ratings?.rapid?.rating}`);
+if (redMe.ratings?.rapid?.deviation !== 290 || blackMe.ratings?.rapid?.deviation !== 290) throw new Error("First-game RD is incorrect");
 if (redMe.ratings?.rapid?.games !== 1 || blackMe.ratings?.rapid?.games !== 1) throw new Error("Rapid game count is not 1");
-if (redMe.ratings?.blitz?.rating !== 1200 || blackMe.ratings?.blitz?.rating !== 1200) throw new Error("Blitz rating changed during Rapid game");
-if (redGame?.ratingDelta !== -20 || blackGame?.ratingDelta !== 20) throw new Error("History rating delta is incorrect");
+if (redMe.ratings?.blitz?.rating !== 1500 || blackMe.ratings?.blitz?.rating !== 1500) throw new Error("Blitz rating changed during Rapid game");
+if (redGame?.ratingDelta !== -162 || blackGame?.ratingDelta !== 162) throw new Error("History Qili rating delta is incorrect");
 
 await writeFile(STATE, JSON.stringify({
   roomId: created.room.id,
   redToken: red.accountToken,
   blackToken: black.accountToken,
-  expectedRed: 1180,
-  expectedBlack: 1220,
+  expectedRed: 1338,
+  expectedBlack: 1662,
 }), { mode: 0o600 });
 
 console.log(JSON.stringify({
@@ -84,10 +86,12 @@ console.log(JSON.stringify({
   pool: redGame.ratingPool,
   redRating: redMe.ratings.rapid.rating,
   blackRating: blackMe.ratings.rapid.rating,
+  redDeviation: redMe.ratings.rapid.deviation,
+  blackDeviation: blackMe.ratings.rapid.deviation,
   redDelta: redGame.ratingDelta,
   blackDelta: blackGame.ratingDelta,
   redRecord: `${redMe.ratings.rapid.wins}-${redMe.ratings.rapid.draws}-${redMe.ratings.rapid.losses}`,
   blackRecord: `${blackMe.ratings.rapid.wins}-${blackMe.ratings.rapid.draws}-${blackMe.ratings.rapid.losses}`,
-  blitzUnchanged: redMe.ratings.blitz.rating === 1200 && blackMe.ratings.blitz.rating === 1200,
+  blitzUnchanged: redMe.ratings.blitz.rating === 1500 && blackMe.ratings.blitz.rating === 1500,
   tokensPrinted: false,
 }, null, 2));
