@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="/online.css" />
     <link rel="stylesheet" href="/kids.css" />
     <link rel="stylesheet" href="/analysis.css" />
+    <link rel="stylesheet" href="/play-v3.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -81,13 +82,12 @@
               <option value="2000">Qili 2000 · 强手 · 校准中</option>
               <option value="max">Qili 2200 · 最高强度 · 校准中</option>
             </select>
-            <p class="level-note">电脑 Qili 分会随真实对局持续校准；电脑局不会改变你的真人 Qili 分。</p>
-            <button id="openOnlinePlayButton" class="button button-primary action-wide online-entry-button">真人在线对弈</button>
+            <p class="level-note">电脑棋力会随真实对局持续校准。</p>
 
             <div class="analysis-toggle-row">
               <div>
                 <strong>棋理分析</strong>
-                <span>只显示可验证证据</span>
+                <span>每步给出简短解释</span>
               </div>
               <label class="switch">
                 <input id="analysisToggle" type="checkbox" checked />
@@ -97,8 +97,8 @@
 
             <div class="analysis-toggle-row hint-toggle-row">
               <div>
-                <strong>显示候选着</strong>
-                <span>开启后在棋盘显示最佳、第二和第三候选</span>
+                <strong>候选着提示</strong>
+                <span>在棋盘显示前三候选</span>
               </div>
               <label class="switch">
                 <input id="moveHintsToggle" type="checkbox" />
@@ -111,7 +111,7 @@
             <div class="section-heading compact">
               <div>
                 <span class="eyebrow">本局记录</span>
-                <h2>着法列表</h2>
+                <h2>本局棋谱</h2>
               </div>
               <span id="moveCount" class="muted-count">0 手</span>
             </div>
@@ -121,10 +121,10 @@
           </section>
 
           <div class="left-actions">
-            <button id="undoStepButton" class="button button-ghost" disabled>退回一步</button>
-            <button id="undoButton" class="button button-ghost" disabled>悔棋一回合</button>
+            <button id="undoStepButton" class="button button-ghost" disabled>退一步</button>
+            <button id="undoButton" class="button button-ghost" disabled>悔棋</button>
             <button id="resumeButton" class="button button-primary action-wide hidden">继续对弈</button>
-            <button id="flipButton" class="button button-ghost action-wide">翻转棋盘</button>
+            <button id="flipButton" class="button button-ghost action-wide">翻转</button>
           </div>
         </aside>
 
@@ -213,8 +213,8 @@
           <div class="coach-header">
             <div class="coach-avatar">AI</div>
             <div>
-              <span class="eyebrow">实时分析</span>
-              <h2>棋理证据</h2>
+              <span class="eyebrow">棋理分析</span>
+              <h2>这一步</h2>
             </div>
           </div>
 

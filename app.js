@@ -1162,9 +1162,9 @@ function aiCoachHtml(analysis) {
   }
   if (ai.state === "unavailable") {
     const message = ai.reason === "restart"
-      ? '本地引擎服务还是旧版本。重启 npm run dev 后才会出现 AI 教练接口。'
-      : 'AI 教练接口已经接好，但服务器没有 GEMINI_API_KEY。Pikafish 和确定性分析仍可正常使用。';
-    return '<article class="coach-card neutral ai-unavailable"><span class="card-kicker">AI 教练未启用</span><h3>目前只能显示可验证分析</h3><p>' + message + '</p></article>';
+      ? 'AI 解释服务正在更新，请稍后重试。'
+      : 'AI 解释暂时不可用；Pikafish 与可验证棋理分析仍可正常使用。';
+    return '<article class="coach-card neutral ai-unavailable"><span class="card-kicker">AI 解释暂不可用</span><h3>先看这一步的棋理</h3><p>' + message + '</p></article>';
   }
   if (ai.state === "error") {
     return '<article class="coach-card warning"><span class="card-kicker">AI 教练请求失败</span><h3>这次只保留确定性分析</h3><p>' + ai.message + '</p></article>';
@@ -1189,7 +1189,7 @@ function aiCoachHtml(analysis) {
 
 function renderCoach() {
   if (!analysisToggleElement.checked) {
-    coachContentElement.innerHTML = '<article class="coach-card neutral"><span class="card-kicker">实时分析已关闭</span><h3>独立思考模式</h3><p>打开后只显示确定性规则命中的棋理证据，以及折叠的原始引擎数据。</p></article>';
+    coachContentElement.innerHTML = '<article class="coach-card neutral"><span class="card-kicker">实时分析已关闭</span><h3>独立思考模式</h3><p>打开后会在每步之后给出简短的棋理解释。</p></article>';
     return;
   }
 

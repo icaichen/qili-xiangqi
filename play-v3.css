@@ -1,0 +1,240 @@
+/* Qili Play workspace v3 — board first, analysis second */
+
+#playView.workspace {
+  max-width: 1460px;
+  grid-template-columns: 208px minmax(620px, 1fr) 292px;
+  gap: 16px;
+  align-items: start;
+}
+
+#playView .left-panel,
+#playView .coach-panel {
+  height: calc(100vh - 56px);
+  min-height: 620px;
+  overflow: hidden;
+  padding: 16px;
+}
+
+/* Left: controls become a compact utility rail instead of a stack of cards. */
+#playView .left-panel {
+  display: flex;
+  flex-direction: column;
+  border-color: #ded9d0;
+  background: #faf8f4;
+}
+
+#playView .left-panel > section:first-child {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e4dfd7;
+}
+
+#playView .left-panel .section-heading { margin-bottom: 10px; }
+#playView .left-panel .section-heading h2 { font-size: 17px; }
+#playView .left-panel .field-label { margin-top: 4px; }
+#playView .left-panel .level-note {
+  margin-top: 6px;
+  color: #96918a;
+  font-size: 9px;
+  line-height: 1.45;
+}
+#playView .online-entry-button {
+  margin-top: 11px;
+  color: #514d47;
+  border: 1px solid #d8d3ca;
+  background: transparent;
+  box-shadow: none;
+}
+#playView .online-entry-button:hover {
+  color: #fff;
+  background: var(--brand-black);
+}
+
+#playView .analysis-toggle-row {
+  margin-top: 8px;
+  padding: 9px 0 0;
+  border: 0;
+  border-top: 1px solid #e7e2da;
+  border-radius: 0;
+  background: transparent;
+}
+#playView .analysis-toggle-row strong { font-size: 12px; }
+#playView .analysis-toggle-row span { font-size: 9px; line-height: 1.35; }
+#playView .hint-toggle-row { background: transparent; }
+
+#playView .history-section {
+  flex: 1;
+  min-height: 0;
+  margin-top: 12px;
+}
+#playView .history-section .section-heading { margin-bottom: 8px; }
+#playView .history-section h2 { font-size: 15px; }
+#playView .move-history {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  border: 0;
+  border-top: 1px solid #e4dfd7;
+  border-bottom: 1px solid #e4dfd7;
+  border-radius: 0;
+  background: transparent;
+}
+#playView .move-history.empty-state { padding: 18px 8px; }
+#playView .move-row { padding: 8px 2px; font-size: 11px; }
+#playView .left-actions { gap: 6px; margin-top: 10px; }
+#playView .left-actions .button { padding: 8px 9px; font-size: 11px; }
+
+/* Center: remove the container visual weight. The board is the product. */
+#playView .board-column {
+  min-height: 0;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#playView .board-toolbar {
+  min-height: 42px;
+  margin: 0;
+  padding: 0 4px 10px;
+}
+#playView .board-footer { padding: 9px 4px 0; }
+#playView .xiangqi-board {
+  width: min(100%, calc((100vh - 132px) * 8 / 9));
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* Right: readable coaching rail, not a developer console. */
+#playView .coach-panel {
+  display: flex;
+  flex-direction: column;
+  color: var(--brand-text);
+  border-color: #ded9d0;
+  background: #f7f4ee;
+}
+#playView .coach-header {
+  flex: 0 0 auto;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #dfdad2;
+}
+#playView .coach-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  font-size: 10px;
+}
+#playView .coach-panel h2,
+#playView .coach-panel h3,
+#playView .coach-panel strong { color: var(--brand-text); }
+#playView .coach-panel .eyebrow { color: #918c85; }
+#playView .coach-content {
+  flex: 1;
+  min-height: 0;
+  gap: 9px;
+  padding-right: 3px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+#playView .coach-card,
+#playView .engine-details {
+  border-color: #ddd8cf;
+  border-radius: 10px;
+  color: #5d5953;
+  background: #fff;
+}
+#playView .coach-card { padding: 13px; }
+#playView .coach-card p,
+#playView .engine-details p { color: #77726b; }
+#playView .coach-panel .button-ghost {
+  color: #4c4943;
+  border-color: #d8d3ca;
+  background: transparent;
+}
+#playView .coach-panel .button-ghost:hover {
+  color: #fff;
+  border-color: var(--brand-black);
+  background: var(--brand-black);
+}
+
+/* The one thing that should demand attention: how the user's move was judged. */
+#playView .beginner-verdict-card,
+#playView .beginner-verdict-card.good,
+#playView .beginner-verdict-card.warning {
+  color: #fff;
+  border-color: #171717;
+  background: #171717;
+}
+#playView .beginner-verdict-card h3,
+#playView .beginner-verdict-card strong { color: #fff; }
+#playView .beginner-verdict-card p { color: #b8b7b3; }
+
+/* AI explanation is content, not another high-contrast panel. */
+#playView .ai-teacher-card {
+  border-color: #ddd8cf;
+  background: #fff;
+}
+#playView .teacher-focus strong,
+#playView .teacher-question strong,
+#playView .teacher-section > strong,
+#playView .teacher-memory strong { color: var(--brand-text); }
+#playView .teacher-question {
+  border-color: #eadad5;
+  background: #fbf1ee;
+}
+#playView .teacher-section { border-top-color: #ebe6df; }
+#playView .teacher-section p { color: #706b64; }
+#playView .teacher-memory { background: #f2eee8; }
+#playView .teacher-memory span { color: #9a6b1f; }
+#playView .teacher-confidence { color: #99948d; }
+
+/* Service status should never compete with the actual chess explanation. */
+#playView .ai-unavailable {
+  padding: 10px 12px;
+  border: 0;
+  background: #ece9e3;
+}
+#playView .ai-unavailable .card-kicker { margin-bottom: 3px; }
+#playView .ai-unavailable h3 { margin-bottom: 3px; font-size: 12px; }
+#playView .ai-unavailable p { font-size: 10px; line-height: 1.45; }
+
+/* Technical evidence stays available, but visually recedes. */
+#playView .engine-details { background: transparent; }
+#playView .engine-details summary { color: #625e57; }
+#playView .verified-evidence-panel,
+#playView .raw-engine-panel {
+  display: none !important;
+}
+#playView .engine-fact-grid > div,
+#playView .candidate-row { background: #efede8; }
+#playView .candidate-score { color: var(--brand-red); }
+#playView .route-view-actions { gap: 7px; }
+#playView .route-view-actions .button { padding: 9px 10px; font-size: 11px; }
+#playView .engine-placeholder {
+  flex: 0 0 auto;
+  margin-top: 10px;
+  padding: 10px 0 0;
+  border-top-color: #dfdad2;
+  color: #8f8a83;
+  background: transparent;
+}
+
+@media (max-width: 1320px) {
+  #playView.workspace {
+    grid-template-columns: 198px minmax(560px, 1fr) 268px;
+    gap: 12px;
+  }
+  #playView .left-panel,
+  #playView .coach-panel { padding: 13px; }
+}
+
+@media (max-height: 760px) {
+  #playView .left-panel,
+  #playView .coach-panel {
+    height: calc(100vh - 32px);
+    min-height: 560px;
+  }
+  #playView .xiangqi-board {
+    width: min(100%, calc((100vh - 105px) * 8 / 9));
+  }
+}
