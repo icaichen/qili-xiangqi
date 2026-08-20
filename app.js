@@ -504,34 +504,52 @@ function renderMoveHints() {
     return;
   }
 
-  const colors = ["#237a52", "#3577b8", "#7d817f"];
-  const widths = [12, 9, 7];
-  const opacities = [0.9, 0.78, 0.66];
-  const definitions = colors.map((color, index) =>
-    '<marker id="hint-arrow-' + index + '" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5.5 L0,11 Z" fill="' + color + '"></path></marker>'
-  ).join("");
-
+  const colors = ["#1f7a4d", "#2d6db4", "#5f6563"];
+  const widths = [10, 8, 7];
   const arrows = moveSuggestions.slice(0, 3).map((item, index) => {
     const from = hintCoordinates(item.move.fromRow, item.move.fromCol);
     const to = hintCoordinates(item.move.toRow, item.move.toCol);
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const length = Math.hypot(dx, dy) || 1;
-    const startPadding = 37;
-    const endPadding = 42;
-    const x1 = from.x + (dx / length) * startPadding;
-    const y1 = from.y + (dy / length) * startPadding;
-    const x2 = to.x - (dx / length) * endPadding;
-    const y2 = to.y - (dy / length) * endPadding;
-    const badgeX = x1 + (x2 - x1) * 0.68;
-    const badgeY = y1 + (y2 - y1) * 0.68;
-    return '<g class="move-hint">' +
-      '<line class="move-hint-line" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + colors[index] + '" stroke-width="' + widths[index] + '" opacity="' + opacities[index] + '" marker-end="url(#hint-arrow-' + index + ')"></line>' +
-      '<g class="move-hint-rank" transform="translate(' + badgeX + ' ' + badgeY + ')"><circle r="18" fill="' + colors[index] + '"></circle><text y="1">' + (index + 1) + '</text></g>' +
+    const ux = dx / length;
+    const uy = dy / length;
+    const color = colors[index];
+    const width = widths[index];
+    const head = Math.max(18, width * 2.2);
+    const destRadius = 22;
+    const startPad = Math.min(46, length * 0.42);
+    const endPad = destRadius + 4;
+    const x1 = from.x + ux * startPad;
+    const y1 = from.y + uy * startPad;
+    const tipX = to.x - ux * Math.min(endPad, length * 0.35);
+    const tipY = to.y - uy * Math.min(endPad, length * 0.35);
+    const baseX = tipX - ux * head;
+    const baseY = tipY - uy * head;
+    const px = -uy;
+    const py = ux;
+    const half = head * 0.4;
+    const shaftOk = Math.hypot(baseX - x1, baseY - y1) > 10;
+    const headPoints = [
+      tipX, tipY,
+      baseX + px * half, baseY + py * half,
+      baseX - px * half, baseY - py * half,
+    ].map((value) => value.toFixed(1)).join(" ");
+
+    return '<g class="move-hint" data-rank="' + (index + 1) + '">' +
+      (shaftOk
+        ? '<line class="move-hint-line" x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + baseX.toFixed(1) + '" y2="' + baseY.toFixed(1) + '" stroke="' + color + '" stroke-width="' + width + '"></line>' +
+          '<polygon class="move-hint-head" points="' + headPoints + '" fill="' + color + '"></polygon>'
+        : '<polygon class="move-hint-head" points="' + headPoints + '" fill="' + color + '"></polygon>') +
+      '<g class="move-hint-dest" transform="translate(' + to.x + ' ' + to.y + ')">' +
+        '<circle class="move-hint-dest-halo" r="36" fill="' + color + '"></circle>' +
+        '<circle class="move-hint-dest-disc" r="' + destRadius + '" fill="' + color + '"></circle>' +
+        '<text y="1">' + (index + 1) + '</text>' +
+      '</g>' +
     '</g>';
   }).join("");
 
-  moveHintsElement.innerHTML = '<defs>' + definitions + '</defs>' + arrows;
+  moveHintsElement.innerHTML = arrows;
 }
 
 async function refreshMoveSuggestions() {
