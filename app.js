@@ -55,6 +55,19 @@ const undoButtonElement = document.querySelector("#undoButton");
 const resumeButtonElement = document.querySelector("#resumeButton");
 const newGameButtonElement = document.querySelector("#newGameButton");
 const flipButtonElement = document.querySelector("#flipButton");
+const leftNewGameButtonElement = document.querySelector("#leftNewGameButton");
+const playViewElement = document.querySelector("#playView");
+const replayArrowsElement = document.querySelector("#replayArrows");
+const boardFooterPlayElement = document.querySelector("#boardFooterPlay");
+const boardReplayBarElement = document.querySelector("#boardReplayBar");
+const boardReplayTitleElement = document.querySelector("#boardReplayTitle");
+const boardReplayStepElement = document.querySelector("#boardReplayStep");
+const boardReplayCounterElement = document.querySelector("#boardReplayCounter");
+const boardReplayPrevElement = document.querySelector("#boardReplayPrev");
+const boardReplayNextElement = document.querySelector("#boardReplayNext");
+const boardReplayCloseElement = document.querySelector("#boardReplayClose");
+const boardReplayYourElement = document.querySelector("#boardReplayYour");
+const boardReplayBestElement = document.querySelector("#boardReplayBest");
 const gameResultOverlayElement = document.querySelector("#gameResultOverlay");
 const gameResultMarkElement = document.querySelector("#gameResultMark");
 const gameResultTitleElement = document.querySelector("#gameResultTitle");
@@ -97,6 +110,8 @@ let pausedAfterUndo = false;
 let moveSuggestions = [];
 let suggestionRequestId = 0;
 let routePreviewState = { route: null, index: 0, title: "", sourceBoard: null };
+let boardReplay = null;
+let boardReplayTimer = null;
 let aiCoachConfigured = false;
 let aiCoachServerAvailable = false;
 let aiCoachModel = "";
@@ -475,6 +490,7 @@ function clearMoveSuggestions() {
 function renderMoveHints() {
   if (!moveHintsElement || !moveHintLegendElement) return;
   const visible = Boolean(
+    !boardReplay &&
     moveHintsToggleElement?.checked &&
     currentTurn === COLORS.RED &&
     !locked &&
@@ -816,6 +832,7 @@ async function analyzeHumanMoveInBackground(sourceBoard, afterHumanBoard, move) 
 
 async function performHumanMove(move) {
   if (locked || gameOver || pausedAfterUndo) return;
+  closeBoardReplay();
   clearMoveSuggestions();
   locked = true;
   selected = null;
@@ -885,7 +902,7 @@ function finishIfNeeded() {
 }
 
 function handlePointClick(row, col) {
-  if (locked || gameOver || currentTurn !== COLORS.RED) return;
+  if (boardReplay || locked || gameOver || currentTurn !== COLORS.RED) return;
   const targetPiece = board[row][col];
 
   if (selected) {
@@ -915,7 +932,13 @@ function handlePointClick(row, col) {
 
 function renderBoard() {
   boardElement.innerHTML = "";
-  const lastHistory = history.at(-1);
+  const replayActive = Boolean(boardReplay);
+  const displayBoard = replayActive
+    ? previewBoardAt(boardReplay.route, boardReplay.index, boardReplay.sourceBoard)
+    : board;
+  const highlightMove = replayActive
+    ? (boardReplay.index > 0 ? boardReplay.route.steps[boardReplay.index - 1]?.move : null)
+    : history.at(-1)?.move;
 
   for (let row = 0; row < ROWS; row += 1) {
     for (let col = 0; col < COLS; col += 1) {
@@ -928,16 +951,22 @@ function renderBoard() {
       point.setAttribute("aria-label", `第 ${row + 1} 行，第 ${col + 1} 列`);
       point.addEventListener("click", () => handlePointClick(row, col));
 
-      const isSelected = selected?.row === row && selected?.col === col;
-      const legalMove = legalTargets.find((move) => move.toRow === row && move.toCol === col);
-      const entry = board[row][col];
+      const isSelected = !replayActive && selected?.row === row && selected?.col === col;
+      const legalMove = replayActive ? null : legalTargets.find((move) => move.toRow === row && move.toCol === col);
+      const entry = displayBoard[row][col];
 
       if (isSelected) point.classList.add("selected");
       if (legalMove) point.classList.add(entry ? "capture" : "legal");
-      if (entry?.color === COLORS.RED && currentTurn === COLORS.RED && !locked) point.classList.add("selectable");
+      if (!replayActive && entry?.color === COLORS.RED && currentTurn === COLORS.RED && !locked) point.classList.add("selectable");
 
-      if (lastHistory?.move.fromRow === row && lastHistory?.move.fromCol === col) point.classList.add("last-from");
-      if (lastHistory?.move.toRow === row && lastHistory?.move.toCol === col) point.classList.add("last-to");
+      if (highlightMove?.fromRow === row && highlightMove?.fromCol === col) {
+        point.classList.add("last-from");
+        if (replayActive) point.classList.add("replay-from");
+      }
+      if (highlightMove?.toRow === row && highlightMove?.toCol === col) {
+        point.classList.add("last-to");
+        if (replayActive) point.classList.add("replay-to");
+      }
 
       if (entry) {
         const pieceElement = document.createElement("span");
@@ -949,6 +978,8 @@ function renderBoard() {
       boardElement.appendChild(point);
     }
   }
+
+  renderReplayArrows();
 }
 
 function renderHistory() {
@@ -1148,98 +1179,156 @@ function requestAiCoachExplanation(analysis) {
   });
 }
 
-function beginnerVerdictHtml(analysis) {
-  if (analysis.selectedIsBest) return '<span class="beginner-judgment good">这步很好</span><h3>' + analysis.moveNotation + ' 就是当前首选</h3><p>这一步不用纠正。下面只看它最值得你理解的棋理。</p>';
-  if (analysis.gap < 30) return '<span class="beginner-judgment good">这步没错</span><h3>' + analysis.moveNotation + ' 可以下</h3><p>它和 ' + analysis.bestMove + ' 的评价非常接近。重点不是记住“唯一答案”，而是理解两种选择有什么不同。</p>';
-  if (analysis.gap < 100) return '<span class="beginner-judgment warning">可以下，但有更准确的选择</span><h3>先比较 ' + analysis.moveNotation + ' 和 ' + analysis.bestMove + '</h3><p>你的走法没有立刻输棋，但首选着更稳或更主动。下面只解释最重要的区别。</p>';
-  return '<span class="beginner-judgment danger">这步需要注意</span><h3>' + analysis.bestMove + ' 明显更好</h3><p>这次不是小差别。先看你的走法给了对手什么机会，再看首选着怎么避免。</p>';
+function moveSummaryMeta(analysis) {
+  if (analysis.selectedIsBest) {
+    return { tone: "good", badge: "这步很好", kicker: "", reason: "这一步就是当前首选，不用纠正。" };
+  }
+  if (analysis.gap < 30) {
+    return { tone: "good", badge: "这步没错", kicker: "", reason: "和 " + analysis.bestMove + " 几乎一样好。重点是看两种选择差在哪里。" };
+  }
+  if (analysis.gap < 100) {
+    return { tone: "warning", badge: "可以更好", kicker: "你错过了", reason: "首选是 " + analysis.bestMove + "。先看最重要的区别。" };
+  }
+  return { tone: "danger", badge: "需要注意", kicker: "你错过了", reason: analysis.bestMove + " 明显更好。先看这步给了对手什么机会。" };
 }
 
-function aiCoachHtml(analysis) {
+function moveSummaryCardHtml(analysis) {
+  const meta = moveSummaryMeta(analysis);
   const ai = analysis.aiCoach;
+  const reason = ai?.state === "ready" && ai.headline ? ai.headline : meta.reason;
+  return '<article class="coach-card move-summary-card ' + meta.tone + '">' +
+    '<span class="beginner-judgment ' + meta.tone + '">' + meta.badge + '</span>' +
+    '<h3>' + analysis.moveNotation + '</h3>' +
+    (meta.kicker ? '<span class="summary-kicker">' + meta.kicker + '</span>' : '') +
+    '<p>' + reason + '</p>' +
+    variationViewerHtml(analysis) +
+  '</article>';
+}
+
+function explanationFallbackHtml(analysis) {
+  const parts = [];
+  if (analysis.selectedIsBest) {
+    parts.push('<p>' + analysis.moveNotation + ' 就是当前首选。下面只看它最值得记住的一点。</p>');
+  } else {
+    parts.push('<p>你走了 ' + analysis.moveNotation + '，但 ' + analysis.bestMove + ' 更值得考虑。</p>');
+  }
+  const fact = analysis.chosenFacts?.[0];
+  if (fact?.detail) parts.push('<p>' + fact.detail + '</p>');
+  else if (analysis.deterministicDifferences?.[0]) parts.push('<p>' + analysis.deterministicDifferences[0] + '</p>');
+  return parts.join("");
+}
+
+function explanationCardHtml(analysis) {
+  const ai = analysis.aiCoach;
+  let body;
   if (!ai || ai.state === "loading") {
-    return '<article class="coach-card ai-teacher-card loading"><span class="card-kicker">AI 教练 · 初学者模式</span><h3>正在把计算翻译成棋理…</h3><p>不是复述主变化，而是在比较两条路线里最值得你学的一件事。</p></article>';
-  }
-  if (ai.state === "unavailable") {
+    body = '<p>正在把这一步翻译成棋理…</p>';
+  } else if (ai.state === "unavailable") {
     const message = ai.reason === "restart"
-      ? 'AI 解释服务正在更新，请稍后重试。'
-      : 'AI 解释暂时不可用；Pikafish 与可验证棋理分析仍可正常使用。';
-    return '<article class="coach-card neutral ai-unavailable"><span class="card-kicker">AI 解释暂不可用</span><h3>先看这一步的棋理</h3><p>' + message + '</p></article>';
-  }
-  if (ai.state === "error") {
-    return '<article class="coach-card warning"><span class="card-kicker">AI 教练请求失败</span><h3>这次只保留确定性分析</h3><p>' + ai.message + '</p></article>';
+      ? "AI 解释服务正在更新，请稍后重试。"
+      : "AI 解释暂时不可用。先看棋盘变化，再对比更好的选择。";
+    body = '<div class="ai-unavailable"><p>' + message + '</p></div>' + explanationFallbackHtml(analysis);
+  } else if (ai.state === "error") {
+    body = '<div class="ai-unavailable"><p>' + ai.message + '</p></div>' + explanationFallbackHtml(analysis);
+  } else {
+    const confidenceLabel = ai.confidence === "high" ? "高" : ai.confidence === "medium" ? "中" : "低";
+    const lessonFocus = ai.teaching?.focus?.concept || "看清这一手的直接作用";
+    const lessonLevel = ai.teaching?.stage?.level ? ai.teaching.stage.level + "级重点" : "基础重点";
+    body =
+      '<div class="teacher-focus"><span>' + lessonLevel + '</span><strong>' + lessonFocus + '</strong></div>' +
+      (ai.question ? '<div class="teacher-question"><span>先看棋盘</span><strong>' + ai.question + '</strong></div>' : '') +
+      '<div class="teacher-section"><strong>原因</strong><p>' + ai.coreReason + '</p></div>' +
+      (ai.comparison ? '<div class="teacher-section"><strong>和更好的选择差在哪里</strong><p>' + ai.comparison + '</p></div>' : '') +
+      (ai.remember ? '<div class="teacher-memory"><span>下次记住</span><strong>' + ai.remember + '</strong></div>' : '') +
+      '<div class="teacher-confidence">解释置信度：' + confidenceLabel + (ai.status === "uncertain" ? " · 标记为不确定" : "") + '</div>';
   }
 
-  const routeKey = analysis.selectedIsBest || analysis.sameRoute ? "your" : "best";
-  const confidenceLabel = ai.confidence === "high" ? "高" : ai.confidence === "medium" ? "中" : "低";
-  const lessonFocus = ai.teaching?.focus?.concept || "看清这一手的直接作用";
-  const lessonLevel = ai.teaching?.stage?.level ? ai.teaching.stage.level + "级重点" : "基础重点";
-  return '<article class="coach-card ai-teacher-card">' +
-    '<span class="card-kicker">AI 教练 · 初学者模式</span>' +
-    '<div class="teacher-focus"><span>' + lessonLevel + '</span><strong>' + lessonFocus + '</strong></div>' +
-    '<h3>' + ai.headline + '</h3>' +
-    '<div class="teacher-question"><span>先看棋盘</span><strong>' + ai.question + '</strong></div>' +
-    '<div class="teacher-section"><strong>答案与原因</strong><p>' + ai.coreReason + '</p></div>' +
-    '<div class="teacher-section"><strong>和另一手差在哪里？</strong><p>' + ai.comparison + '</p></div>' +
-    '<div class="teacher-section show-me-section"><strong>给我看</strong><p>' + ai.showMe + '</p><button class="button button-primary route-preview-trigger" data-route="' + routeKey + '">在棋盘上走给我看</button></div>' +
-    '<div class="teacher-memory"><span>下次记住</span><strong>' + ai.remember + '</strong></div>' +
-    '<div class="teacher-confidence">解释置信度：' + confidenceLabel + (ai.status === "uncertain" ? ' · AI明确标记为不确定' : '') + '</div>' +
-  '</article>';
+  return '<details class="coach-explanation">' +
+    '<summary>为什么？</summary>' +
+    '<div class="explanation-body">' + body + '</div>' +
+  '</details>';
+}
+
+function variationViewerHtml(analysis) {
+  if (!analysis?.routes?.your && !analysis?.routes?.best) return "";
+  return '<button class="button button-primary route-preview-trigger" data-route="your" type="button">查看变化</button>';
+}
+
+function engineSearchDepth(analysis) {
+  const match = String(analysis.engineDetail || "").match(/搜索深度\s+(\S+)/);
+  return match ? match[1].replace(/。$/, "") : "—";
+}
+
+function engineDetailsHtml(analysis) {
+  const rankText = analysis.moveRank ? "第 " + analysis.moveRank + " 候选" : "未进入前五候选";
+  const evidence = analysis.hasVerifiedReason
+    ? '<div class="verified-evidence-content">' +
+        verifiedFactsHtml(analysis.chosenFacts, "你的走法没有命中直接战术规则。") +
+        comparisonFactsHtml(analysis.deterministicDifferences) +
+        (analysis.bestFacts.length ? '<div class="evidence-subsection"><strong>首选着的可验证作用</strong>' + verifiedFactsHtml(analysis.bestFacts) + '</div>' : '') +
+        (analysis.replyFacts.length ? '<div class="evidence-subsection"><strong>对手回应中的明确威胁：' + analysis.opponentMove + '</strong>' + verifiedFactsHtml(analysis.replyFacts) + '</div>' : '') +
+        routeComparisonHtml(analysis.routeComparisons) +
+      '</div>'
+    : "";
+
+  return '<details class="coach-engine engine-details">' +
+    '<summary>高级分析</summary>' +
+    '<div class="engine-body raw-engine-content">' +
+      '<p>Pikafish</p>' +
+      '<div class="engine-fact-grid">' +
+        '<div><span>Evaluation</span><strong>' + formatEngineScore(analysis.chosenScore) + '</strong></div>' +
+        '<div><span>Best</span><strong>' + formatEngineScore(analysis.bestScore) + '</strong></div>' +
+        '<div><span>Depth</span><strong>' + engineSearchDepth(analysis) + '</strong></div>' +
+        '<div><span>Gap</span><strong>' + formatEngineScore(analysis.gap) + '</strong></div>' +
+      '</div>' +
+      '<p><strong>候选排名：</strong>' + rankText + '</p>' +
+      '<p><strong>对手首选回应：</strong>' + analysis.rawEngine.opponentMove + '</p>' +
+      '<p><strong>PV：</strong>' + analysis.rawEngine.yourSequence + '</p>' +
+      (analysis.sameRoute ? "" : '<p><strong>最佳 PV：</strong>' + analysis.rawEngine.bestSequence + '</p>') +
+      '<div class="candidate-list">' + candidateRowsHtml(analysis.candidates) + '</div>' +
+      evidence +
+      '<p class="engine-detail-line">' + analysis.engineDetail + '</p>' +
+    '</div>' +
+  '</details>';
+}
+
+function analysisOffCardHtml() {
+  return '<article class="coach-empty"><h3>独立思考模式</h3><p>打开「棋理分析」后，每一步都会得到简短解释。</p></article>';
+}
+
+function emptyCoachHtml() {
+  return '<article class="coach-empty"><h3>等待你的下一步</h3><p>每一步都会获得：</p><ul><li>为什么</li><li>更好的选择</li><li>棋理建议</li></ul></article>';
+}
+
+function setCoachHtml(html) {
+  const explanationOpen = Boolean(coachContentElement.querySelector(".coach-explanation")?.open);
+  const advancedOpen = Boolean(coachContentElement.querySelector(".coach-engine")?.open);
+  if (coachContentElement.dataset.html === html) return;
+  coachContentElement.dataset.html = html;
+  coachContentElement.innerHTML = html;
+  const explanation = coachContentElement.querySelector(".coach-explanation");
+  const advanced = coachContentElement.querySelector(".coach-engine");
+  if (explanation) explanation.open = explanationOpen;
+  if (advanced) advanced.open = advancedOpen;
 }
 
 function renderCoach() {
   if (!analysisToggleElement.checked) {
-    coachContentElement.innerHTML = '<article class="coach-card neutral"><span class="card-kicker">实时分析已关闭</span><h3>独立思考模式</h3><p>打开后会在每步之后给出简短的棋理解释。</p></article>';
+    closeBoardReplay();
+    setCoachHtml(analysisOffCardHtml());
     return;
   }
 
   if (!coachAnalysis) {
-    coachContentElement.innerHTML = '<article class="coach-card neutral beginner-empty"><span class="card-kicker">初学者教练</span><h3>走一步，我告诉你真正该看什么</h3><p>先判断这步有没有问题，再只讲一个最重要的原因，并用棋盘主变化演示。引擎分数和技术数据默认隐藏。</p></article>';
+    setCoachHtml(emptyCoachHtml());
     return;
   }
 
-  const qualityClass = coachAnalysis.quality === "good" ? "good" : "warning";
-  const rankText = coachAnalysis.moveRank ? '第 ' + coachAnalysis.moveRank + ' 候选' : '未进入前五候选';
-  const routeButtons =
-    '<div class="route-view-actions">' +
-      '<button class="button button-ghost route-preview-trigger" data-route="your">' + (coachAnalysis.selectedIsBest ? '在棋盘查看主变化' : '在棋盘查看你的路线') + '</button>' +
-      (coachAnalysis.sameRoute ? '' : '<button class="button button-primary route-preview-trigger" data-route="best">在棋盘查看首选路线</button>') +
-    '</div>';
-
-  const evidenceSection = coachAnalysis.hasVerifiedReason
-    ? '<details class="engine-details verified-evidence-panel">' +
-        '<summary>查看这段分析用了哪些可验证证据</summary>' +
-        '<div class="verified-evidence-content">' +
-          verifiedFactsHtml(coachAnalysis.chosenFacts, '你的走法没有命中直接战术规则。') +
-          comparisonFactsHtml(coachAnalysis.deterministicDifferences) +
-          (coachAnalysis.bestFacts.length ? '<div class="evidence-subsection"><strong>首选着的可验证作用</strong>' + verifiedFactsHtml(coachAnalysis.bestFacts) + '</div>' : '') +
-          (coachAnalysis.replyFacts.length ? '<div class="evidence-subsection"><strong>对手回应中的明确威胁：' + coachAnalysis.opponentMove + '</strong>' + verifiedFactsHtml(coachAnalysis.replyFacts) + '</div>' : '') +
-          routeComparisonHtml(coachAnalysis.routeComparisons) +
-        '</div>' +
-      '</details>'
-    : '';
-
-  coachContentElement.innerHTML =
-    '<article class="coach-card beginner-verdict-card ' + qualityClass + '">' + beginnerVerdictHtml(coachAnalysis) + '</article>' +
-    aiCoachHtml(coachAnalysis) +
-    evidenceSection +
-    '<details class="engine-details raw-engine-panel">' +
-      '<summary>查看Pikafish原始数据与主变化</summary>' +
-      '<div class="raw-engine-content">' +
-        '<div class="engine-fact-grid">' +
-          '<div><span>你的评价</span><strong>' + formatEngineScore(coachAnalysis.chosenScore) + '</strong></div>' +
-          '<div><span>首选评价</span><strong>' + formatEngineScore(coachAnalysis.bestScore) + '</strong></div>' +
-          '<div><span>评价差</span><strong>' + formatEngineScore(coachAnalysis.gap) + '</strong></div>' +
-        '</div>' +
-        '<p><strong>候选排名：</strong>' + rankText + '</p>' +
-        '<p><strong>对手首选回应：</strong>' + coachAnalysis.rawEngine.opponentMove + '</p>' +
-        '<p><strong>你的路线：</strong>' + coachAnalysis.rawEngine.yourSequence + '</p>' +
-        (coachAnalysis.sameRoute ? '' : '<p><strong>首选路线：</strong>' + coachAnalysis.rawEngine.bestSequence + '</p>') +
-        routeButtons +
-        '<div class="candidate-list">' + candidateRowsHtml(coachAnalysis.candidates) + '</div>' +
-        '<p class="engine-detail-line">' + coachAnalysis.engineDetail + '</p>' +
-      '</div>' +
-    '</details>';
+  setCoachHtml(
+    moveSummaryCardHtml(coachAnalysis) +
+    explanationCardHtml(coachAnalysis) +
+    engineDetailsHtml(coachAnalysis)
+  );
 }
 
 function render() {
@@ -1266,6 +1355,7 @@ function resetGame() {
   computerGameId = createComputerGameId();
   computerGameStartedAt = Date.now();
   hideGameResult();
+  closeBoardReplay();
   clearMoveSuggestions();
   lastMoveLabelElement.textContent = "请选择一个棋子开始";
   render();
@@ -1284,6 +1374,7 @@ function restoreAfterUndo(removeCount, forceRedTurn) {
   coachAnalysis = null;
   engineEvaluationCp = null;
   hideGameResult();
+  closeBoardReplay();
   lastMoveLabelElement.textContent = history.length ? "已回到 " + history.at(-1).notation + " 之后" : "请选择一个棋子开始";
 }
 
@@ -1319,14 +1410,107 @@ async function resumeAfterUndo() {
   }
 }
 
-function previewBoardAt(route, index) {
-  const sourceBoard = routePreviewState.sourceBoard || coachAnalysis?.sourceBoard;
-  if (!sourceBoard) return createEmptyBoard();
-  let previewBoard = cloneBoard(sourceBoard);
+function previewBoardAt(route, index, sourceBoard) {
+  const base = sourceBoard || routePreviewState.sourceBoard || boardReplay?.sourceBoard || coachAnalysis?.sourceBoard;
+  if (!base || !route) return createEmptyBoard();
+  let previewBoard = cloneBoard(base);
   for (let stepIndex = 0; stepIndex < index; stepIndex += 1) {
-    previewBoard = applyMove(previewBoard, route.steps[stepIndex].move).board;
+    const step = route.steps[stepIndex];
+    if (!step?.move) break;
+    previewBoard = applyMove(previewBoard, step.move).board;
   }
   return previewBoard;
+}
+
+function stopBoardReplayTimer() {
+  if (boardReplayTimer) {
+    clearInterval(boardReplayTimer);
+    boardReplayTimer = null;
+  }
+}
+
+function renderReplayArrows() {
+  if (!replayArrowsElement) return;
+  if (!boardReplay || boardReplay.index === 0) {
+    replayArrowsElement.innerHTML = "";
+    return;
+  }
+  const step = boardReplay.route.steps[boardReplay.index - 1];
+  if (!step?.move) {
+    replayArrowsElement.innerHTML = "";
+    return;
+  }
+  const from = hintCoordinates(step.move.fromRow, step.move.fromCol);
+  const to = hintCoordinates(step.move.toRow, step.move.toCol);
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const x1 = from.x + (dx / length) * 37;
+  const y1 = from.y + (dy / length) * 37;
+  const x2 = to.x - (dx / length) * 42;
+  const y2 = to.y - (dy / length) * 42;
+  replayArrowsElement.innerHTML =
+    '<defs><marker id="replay-arrow-head" markerWidth="11" markerHeight="11" refX="8" refY="5.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5.5 L0,11 Z" fill="#ed482f"></path></marker></defs>' +
+    '<line class="replay-arrow-line" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '"></line>';
+}
+
+function updateBoardReplayChrome() {
+  if (!boardReplay || !boardReplayBarElement) return;
+  const route = boardReplay.route;
+  const activeStep = boardReplay.index > 0 ? route.steps[boardReplay.index - 1] : null;
+  playViewElement?.classList.add("replay-active");
+  boardFooterPlayElement?.classList.add("hidden");
+  boardReplayBarElement.classList.remove("hidden");
+  boardReplayTitleElement.textContent = boardReplay.title;
+  boardReplayStepElement.textContent = activeStep
+    ? (activeStep.notation + (activeStep.events?.length ? " · " + activeStep.events.join("、") : ""))
+    : "起始局面";
+  boardReplayCounterElement.textContent = boardReplay.index + " / " + route.steps.length;
+  boardReplayPrevElement.disabled = boardReplay.index === 0;
+  boardReplayNextElement.disabled = boardReplay.index >= route.steps.length;
+  boardReplayYourElement?.classList.toggle("active", boardReplay.key === "your");
+  boardReplayBestElement?.classList.toggle("active", boardReplay.key === "best");
+  boardReplayBestElement?.classList.toggle("hidden", Boolean(coachAnalysis?.sameRoute));
+}
+
+function renderBoardReplay() {
+  if (!boardReplay) return;
+  updateBoardReplayChrome();
+  renderBoard();
+  renderMoveHints();
+}
+
+function openBoardReplay(routeKey) {
+  if (!coachAnalysis?.routes?.[routeKey]) return;
+  stopBoardReplayTimer();
+  const route = coachAnalysis.routes[routeKey];
+  boardReplay = {
+    key: routeKey,
+    route,
+    index: route.steps.length ? 1 : 0,
+    title: routeKey === "best" ? "最佳路线" : "你的路线",
+    sourceBoard: cloneBoard(coachAnalysis.sourceBoard),
+  };
+  renderBoardReplay();
+}
+
+function closeBoardReplay() {
+  if (!boardReplay) return;
+  stopBoardReplayTimer();
+  boardReplay = null;
+  playViewElement?.classList.remove("replay-active");
+  boardReplayBarElement?.classList.add("hidden");
+  boardFooterPlayElement?.classList.remove("hidden");
+  if (replayArrowsElement) replayArrowsElement.innerHTML = "";
+  renderBoard();
+  renderMoveHints();
+}
+
+function stepBoardReplay(delta) {
+  if (!boardReplay) return;
+  stopBoardReplayTimer();
+  boardReplay.index = Math.max(0, Math.min(boardReplay.route.steps.length, boardReplay.index + delta));
+  renderBoardReplay();
 }
 
 function renderRoutePreview() {
@@ -1363,6 +1547,11 @@ function renderRoutePreview() {
 
 function openRoutePreview(routeKey) {
   if (!coachAnalysis?.routes?.[routeKey]) return;
+  const playVisible = playViewElement && !playViewElement.classList.contains("hidden");
+  if (playVisible) {
+    openBoardReplay(routeKey);
+    return;
+  }
   routePreviewState = {
     route: coachAnalysis.routes[routeKey],
     index: 0,
@@ -1401,6 +1590,11 @@ coachContentElement?.addEventListener("click", (event) => {
   const button = event.target.closest(".route-preview-trigger");
   if (button) openRoutePreview(button.dataset.route);
 });
+boardReplayPrevElement?.addEventListener("click", () => stepBoardReplay(-1));
+boardReplayNextElement?.addEventListener("click", () => stepBoardReplay(1));
+boardReplayCloseElement?.addEventListener("click", closeBoardReplay);
+boardReplayYourElement?.addEventListener("click", () => openBoardReplay("your"));
+boardReplayBestElement?.addEventListener("click", () => openBoardReplay("best"));
 routePreviewPrevElement?.addEventListener("click", () => {
   routePreviewState.index = Math.max(0, routePreviewState.index - 1);
   renderRoutePreview();
@@ -1415,6 +1609,7 @@ routePreviewModalElement?.addEventListener("click", (event) => {
 });
 
 newGameButtonElement?.addEventListener("click", resetGame);
+leftNewGameButtonElement?.addEventListener("click", resetGame);
 undoStepButtonElement?.addEventListener("click", undoOneStep);
 undoButtonElement?.addEventListener("click", undoTurn);
 resumeButtonElement?.addEventListener("click", resumeAfterUndo);
@@ -1472,8 +1667,13 @@ openNotationButtonElement?.addEventListener("click", openNotationLesson);
 closeNotationButtonElement?.addEventListener("click", closeNotationLesson);
 notationModalElement?.querySelector("[data-close-notation]")?.addEventListener("click", closeNotationLesson);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !notationModalElement?.classList.contains("hidden")) closeNotationLesson();
-  if (event.key === "Escape" && !routePreviewModalElement?.classList.contains("hidden")) closeRoutePreview();
+  if (event.key !== "Escape") return;
+  if (boardReplay) {
+    closeBoardReplay();
+    return;
+  }
+  if (!notationModalElement?.classList.contains("hidden")) closeNotationLesson();
+  if (!routePreviewModalElement?.classList.contains("hidden")) closeRoutePreview();
 });
 
 document.querySelectorAll(".notation-example").forEach((button) => {
@@ -1499,6 +1699,8 @@ function switchPlatformView(viewName) {
   document.querySelectorAll(".platform-nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === navTarget));
   document.querySelector(".play-only-action")?.classList.toggle("hidden", target !== "play");
   quickPlayButtonElement?.classList.toggle("hidden", target === "play" || target === "online");
+  document.body.classList.toggle("play-mode", target === "play");
+  if (target !== "play") closeBoardReplay();
 }
 
 window.XiangqiPlatform = { switchView: switchPlatformView };

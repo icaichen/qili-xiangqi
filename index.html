@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="/online.css" />
     <link rel="stylesheet" href="/kids.css" />
     <link rel="stylesheet" href="/analysis.css" />
-    <link rel="stylesheet" href="/play-v3.css" />
+    <link rel="stylesheet" href="/play-layout-v2.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -60,7 +60,7 @@
         </div>
       </section>
 
-      <main id="playView" class="workspace platform-view hidden">
+      <main id="playView" class="workspace platform-view play-workspace hidden">
         <aside class="panel left-panel">
           <section>
             <div class="section-heading">
@@ -121,10 +121,11 @@
           </section>
 
           <div class="left-actions">
-            <button id="undoStepButton" class="button button-ghost" disabled>退一步</button>
+            <button id="leftNewGameButton" class="button button-secondary">重新开始</button>
             <button id="undoButton" class="button button-ghost" disabled>悔棋</button>
+            <button id="undoStepButton" class="button button-ghost" disabled>退一步</button>
+            <button id="flipButton" class="button button-ghost">翻转</button>
             <button id="resumeButton" class="button button-primary action-wide hidden">继续对弈</button>
-            <button id="flipButton" class="button button-ghost action-wide">翻转</button>
           </div>
         </aside>
 
@@ -140,6 +141,7 @@
             </div>
           </div>
 
+          <div class="board-area">
           <div id="board" class="xiangqi-board" aria-label="中国象棋棋盘">
             <svg class="board-lines" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true">
               <g class="grid-lines">
@@ -178,6 +180,7 @@
               <text x="625" y="470" class="river-label">汉 界</text>
             </svg>
             <svg id="moveHints" class="move-hints" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true"></svg>
+            <svg id="replayArrows" class="replay-arrows" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true"></svg>
             <div id="boardPoints" class="board-points"></div>
             <div id="gameResultOverlay" class="game-result-overlay hidden" role="dialog" aria-live="assertive" aria-labelledby="gameResultTitle">
               <div class="game-result-card">
@@ -198,14 +201,34 @@
               </div>
             </div>
           </div>
+          </div>
 
           <div class="board-footer">
-            <div class="move-hint-legend" id="moveHintLegend">
-              <span class="hint-best"><i></i>1 最佳</span>
-              <span class="hint-second"><i></i>2 第二</span>
-              <span class="hint-third"><i></i>3 第三</span>
+            <div id="boardFooterPlay" class="board-footer-play">
+              <div class="move-hint-legend" id="moveHintLegend">
+                <span class="hint-best"><i></i>1 最佳</span>
+                <span class="hint-second"><i></i>2 第二</span>
+                <span class="hint-third"><i></i>3 第三</span>
+              </div>
+              <span id="lastMoveLabel">请选择一个棋子开始</span>
             </div>
-            <span id="lastMoveLabel">请选择一个棋子开始</span>
+            <div id="boardReplayBar" class="board-replay-bar hidden">
+              <div class="board-replay-copy">
+                <span class="eyebrow">变化演示</span>
+                <strong id="boardReplayTitle">你的路线</strong>
+                <span id="boardReplayStep">起始局面</span>
+              </div>
+              <div class="board-replay-tabs">
+                <button id="boardReplayYour" class="button button-ghost" type="button">你的路线</button>
+                <button id="boardReplayBest" class="button button-ghost" type="button">最佳路线</button>
+              </div>
+              <div class="board-replay-controls">
+                <button id="boardReplayPrev" class="button button-ghost" type="button">上一步</button>
+                <output id="boardReplayCounter">0 / 0</output>
+                <button id="boardReplayNext" class="button button-primary" type="button">下一步</button>
+                <button id="boardReplayClose" class="button button-ghost" type="button">退出</button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -213,29 +236,27 @@
           <div class="coach-header">
             <div class="coach-avatar">AI</div>
             <div>
-              <span class="eyebrow">棋理分析</span>
-              <h2>这一步</h2>
+              <span class="eyebrow">每一步的解释</span>
+              <h2>AI Coach</h2>
             </div>
           </div>
 
           <div id="coachContent" class="coach-content">
-            <article class="coach-card neutral">
-              <span class="card-kicker">确定性分析</span>
-              <h3>只展示可验证证据</h3>
-              <p>没有命中战术规则时，不会生成“为什么”的文字解释。</p>
-            </article>
-
-            <article class="coach-card principle">
-              <span class="card-kicker">本局训练重点</span>
-              <h3>先看强制手段</h3>
-              <p>每次走棋前，依次检查：将军、吃子、直接威胁，再考虑普通改善棋形的走法。</p>
+            <article class="coach-empty">
+              <h3>等待你的下一步</h3>
+              <p>每一步都会获得：</p>
+              <ul>
+                <li>为什么</li>
+                <li>更好的选择</li>
+                <li>棋理建议</li>
+              </ul>
             </article>
           </div>
 
           <div class="engine-placeholder">
             <div>
               <span class="engine-dot"></span>
-              <strong>分析核心</strong>
+              <strong>分析状态</strong>
             </div>
             <span id="engineState">正在连接 Pikafish…</span>
           </div>
