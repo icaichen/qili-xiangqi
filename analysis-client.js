@@ -19,7 +19,7 @@ if (root) {
   let board = createInitialBoard();
   let sideToMove = "red";
   let flipped = false;
-  let phase = "setup";
+  let editing = false;
   let tray = null;
   let selected = null;
   let legalTargets = [];
@@ -30,8 +30,15 @@ if (root) {
   let analysis = null;
   let analyzing = false;
   let recognizing = false;
-  let history = [];
+  let selectedLine = 0;
   let requestId = 0;
+  let nodes = [{ board: createInitialBoard(), sideToMove: "red", notation: "", color: null }];
+  let cursor = 0;
+  let coachAnalysis = null;
+  let coachRequestId = 0;
+  let replay = null;
+  let explanationOpen = false;
+  let advancedOpen = false;
 
   function piece(type, color) {
     return { type, color, label: PIECE_LABELS[color][type] };
@@ -63,13 +70,8 @@ if (root) {
     return source.map((row) => row.map((entry) => (entry ? { ...entry } : null)));
   }
 
-  function displayRow(row) {
-    return flipped ? 9 - row : row;
-  }
-
-  function displayCol(col) {
-    return flipped ? 8 - col : col;
-  }
+  function displayRow(row) { return flipped ? 9 - row : row; }
+  function displayCol(col) { return flipped ? 8 - col : col; }
 
   function fileName(col, color) {
     return color === "red" ? RED_NUMERALS[8 - col] : String(col + 1);
@@ -114,6 +116,21 @@ if (root) {
     return `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
   }
 
+  function evalLabel(cp) {
+    if (!Number.isFinite(cp)) return "等待引擎";
+    if (cp > 180) return "红方明显占优";
+    if (cp > 60) return "红方稍好";
+    if (cp < -180) return "黑方明显占优";
+    if (cp < -60) return "黑方稍好";
+    return "均势";
+  }
+
+  function redShare(cp) {
+    if (!Number.isFinite(cp)) return 50;
+    if (Math.abs(cp) >= 90000) return cp > 0 ? 96 : 4;
+    return Math.max(6, Math.min(94, 50 + 50 * Math.tanh(cp / 450)));
+  }
+
   function escapeHtml(value) {
     return String(value || "")
       .replaceAll("&", "&amp;")
@@ -131,49 +148,15 @@ if (root) {
   }
 
   function legalMoves(source, color) {
-    const api = rules();
-    if (!api?.generateLegalMoves) return [];
-    return api.generateLegalMoves(source, color);
+    return rules()?.generateLegalMoves?.(source, color) || [];
   }
 
   function legalMovesAt(source, row, col) {
-    const api = rules();
-    if (!api?.legalMovesForPiece) return [];
-    return api.legalMovesForPiece(source, row, col);
+    return rules()?.legalMovesForPiece?.(source, row, col) || [];
   }
 
   function applyLegalMove(source, move) {
-    const api = rules();
-    if (!api?.applyMove) return source;
-    return api.applyMove(source, move).board;
-  }
-
-  function inCheck(source, color) {
-    return Boolean(rules()?.isInCheck?.(source, color));
-  }
-
-  function urgentFacts(source, color) {
-    const facts = [];
-    const ownLegal = legalMoves(source, color);
-    const opponent = color === "red" ? "black" : "red";
-    const opponentLegal = legalMoves(source, opponent);
-    if (inCheck(source, color)) facts.push(color === "red" ? "红帅正在被将军" : "黑将正在被将军");
-    if (!ownLegal.length) facts.push(inCheck(source, color) ? "没有合法应将，这是将死" : "没有合法着可走，按规则负");
-    const hanging = [];
-    opponentLegal.forEach((move) => {
-      const target = source[move.toRow]?.[move.toCol];
-      if (!target || target.color !== color || target.type === "general") return;
-      const after = applyLegalMove(source, move);
-      const recapture = legalMoves(after, color).some((reply) => reply.toRow === move.toRow && reply.toCol === move.toCol);
-      if (!recapture) hanging.push(target.label);
-    });
-    if (hanging.length) facts.push(`有子可能被白吃：${[...new Set(hanging)].join("、")}`);
-    const captures = ownLegal.filter((move) => source[move.toRow][move.toCol]).length;
-    if (captures && !facts.some((text) => text.includes("将军") || text.includes("将死"))) {
-      facts.push(`当前有 ${captures} 个直接吃子机会`);
-    }
-    if (!facts.length) facts.push("暂时没有一眼能看出的强制手，先比较候选着");
-    return facts;
+    return rules()?.applyMove?.(source, move).board || source;
   }
 
   function boardFromPieces(pieces) {
@@ -189,137 +172,315 @@ if (root) {
     return `left:${(displayCol(col) / 8) * 100}%;top:${(displayRow(row) / 9) * 100}%`;
   }
 
+  function formatPv(sourceBoard, side, uciMoves, limit = 6) {
+    let working = cloneBoard(sourceBoard);
+    let color = side;
+    const out = [];
+    for (const uci of (uciMoves || []).slice(0, limit)) {
+      const move = engine?.uciToMove?.(uci, working);
+      if (!move) break;
+      out.push(formatMove(move, working));
+      working = applyLegalMove(working, move);
+      color = color === "red" ? "black" : "red";
+    }
+    return out;
+  }
+
+  function restoreNode(index) {
+    const node = nodes[index];
+    if (!node) return;
+    cursor = index;
+    board = cloneBoard(node.board);
+    sideToMove = node.sideToMove;
+    selected = null;
+    legalTargets = [];
+  }
+
+  function pushMove(move, notation) {
+    nodes = nodes.slice(0, cursor + 1);
+    const nextBoard = applyLegalMove(board, move);
+    const nextSide = sideToMove === "red" ? "black" : "red";
+    nodes.push({
+      board: cloneBoard(nextBoard),
+      sideToMove: nextSide,
+      notation,
+      color: sideToMove,
+      move: { ...move },
+    });
+    cursor = nodes.length - 1;
+    board = cloneBoard(nextBoard);
+    sideToMove = nextSide;
+    selected = null;
+    legalTargets = [];
+    hintMove = { fromRow: move.fromRow, fromCol: move.fromCol, toRow: move.toRow, toCol: move.toCol };
+  }
+
+  function renderArrow(move) {
+    if (!move) return "";
+    const from = { x: displayCol(move.fromCol) * 100, y: displayRow(move.fromRow) * 100 };
+    const to = { x: displayCol(move.toCol) * 100, y: displayRow(move.toRow) * 100 };
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const ux = dx / length;
+    const uy = dy / length;
+    const x1 = from.x + ux * 42;
+    const y1 = from.y + uy * 42;
+    const x2 = to.x - ux * 28;
+    const y2 = to.y - uy * 28;
+    return `<svg class="replay-arrows analysis-arrow" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true">
+      <defs><marker id="analysis-arrow-head" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#ed482f"></path></marker></defs>
+      <line class="replay-arrow-line" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" marker-end="url(#analysis-arrow-head)"></line>
+    </svg>`;
+  }
+
   function render() {
+    explanationOpen = Boolean(root.querySelector(".coach-explanation")?.open);
+    advancedOpen = Boolean(root.querySelector(".coach-engine")?.open);
     const generals = countGenerals(board);
-    const canAnalyze = generals.red === 1 && generals.black === 1 && !analyzing;
-    const trayHtml = TRAY.map((group) => `
-      <div class="analysis-tray-row">
-        ${group.types.map((type) => {
-          const active = tray?.type === type && tray?.color === group.color ? " active" : "";
-          return `<button type="button" class="analysis-tray-btn ${group.color}${active}" data-tray-type="${type}" data-tray-color="${group.color}">${PIECE_LABELS[group.color][type]}</button>`;
-        }).join("")}
-      </div>
-    `).join("");
+    const canExplore = generals.red === 1 && generals.black === 1;
+    const best = analysis?.lines?.[0];
+    const scoreCp = analysis?.lines?.[0]?.numericScore;
+    const redPct = redShare(scoreCp);
+    const topPct = flipped ? redPct : 100 - redPct;
+    const redAhead = (scoreCp || 0) >= 0;
+    const displayBoard = replay ? previewReplayBoard() : board;
+    const replayStep = replay && replay.index > 0 ? replay.route.steps[replay.index - 1] : null;
+    const arrowMove = replay ? replayStep?.move : hintMove;
+    const trayHtml = TRAY.map((group) => group.types.map((type) => {
+      const active = tray?.type === type && tray?.color === group.color ? " active" : "";
+      return `<button type="button" class="analysis-tray-btn ${group.color}${active}" data-tray-type="${type}" data-tray-color="${group.color}">${PIECE_LABELS[group.color][type]}</button>`;
+    }).join("")).join("");
 
     const points = [];
     for (let row = 0; row < ROWS; row += 1) {
       for (let col = 0; col < COLS; col += 1) {
-        const entry = board[row][col];
-        const isSelected = selected?.row === row && selected?.col === col;
-        const legal = legalTargets.some((item) => item.toRow === row && item.toCol === col);
-        const capture = legal && entry;
+        const entry = displayBoard[row][col];
+        const legal = !replay && legalTargets.some((item) => item.toRow === row && item.toCol === col);
         const classes = [
-          "analysis-board-point",
-          isSelected ? "selected" : "",
-          legal ? "legal" : "",
-          capture ? "capture" : "",
-          hintMove && hintMove.fromRow === row && hintMove.fromCol === col ? "hint-from" : "",
-          hintMove && hintMove.toRow === row && hintMove.toCol === col ? "hint-to" : "",
-          suspects.has(`${row},${col}`) ? "suspect" : "",
+          "board-point",
+          !replay && selected?.row === row && selected?.col === col ? "selected" : "",
+          legal ? (entry ? "capture" : "legal") : "",
+          arrowMove?.fromRow === row && arrowMove?.fromCol === col ? "last-from replay-from" : "",
+          arrowMove?.toRow === row && arrowMove?.toCol === col ? "last-to replay-to" : "",
+          !replay && suspects.has(`${row},${col}`) ? "selected" : "",
+          !replay && !editing && !tray && entry?.color === sideToMove ? "selectable" : "",
         ].filter(Boolean).join(" ");
-        points.push(`<button type="button" class="${classes}" data-row="${row}" data-col="${col}" style="${pointStyle(row, col)}" aria-label="${row + 1}行${col + 1}列${entry ? "，" + entry.label : ""}">${entry ? `<span class="analysis-piece ${entry.color}">${entry.label}</span>` : ""}</button>`);
+        points.push(`<button type="button" class="${classes}" data-row="${row}" data-col="${col}" style="${pointStyle(row, col)}">${entry ? `<span class="piece ${entry.color}-piece">${entry.label}</span>` : ""}</button>`);
       }
     }
 
-    const resultHtml = analysis ? renderResult() : `
-      <div class="analysis-empty">摆好棋盘、确认轮到谁，再开始分析。截图只用来填盘，分析前请看一眼棋子对不对。</div>
-    `;
+    const lines = analysis?.lines || [];
+    const tools = window.QiliReviewCoach;
+    let coachHtml;
+    if (analysis?.error && !coachAnalysis) {
+      coachHtml = `<article class="coach-empty"><h3>还不能分析</h3><p>${escapeHtml(analysis.error)}</p></article>`;
+    } else if (coachAnalysis?.pending) {
+      coachHtml = `<article class="coach-card move-summary-card">
+          <span class="beginner-judgment">正在讲解</span>
+          <h3>${escapeHtml(coachAnalysis.moveNotation || "这一手")}</h3>
+          <p>正在比较你的走法与更好的选择…</p>
+        </article>
+        <details class="coach-explanation" open>
+          <summary>为什么？</summary>
+          <div class="explanation-body"><p>正在把这一步翻译成棋理…</p></div>
+        </details>`;
+    } else if (coachAnalysis?.error) {
+      coachHtml = `<article class="coach-empty"><h3>暂时无法讲解</h3><p>${escapeHtml(coachAnalysis.error)}</p></article>`;
+    } else if (coachAnalysis && tools?.panelHtml) {
+      coachHtml = tools.panelHtml(coachAnalysis);
+    } else {
+      coachHtml = tools?.emptyHtml?.() || `<article class="coach-empty">
+          <h3>${analyzing ? "正在计算" : canExplore ? "等待你的下一步" : "摆好双方将帅"}</h3>
+          <p>${analyzing ? "Pikafish 正在算这一手。" : canExplore ? "在棋盘上走子，评估和首选会跟着变。" : "棋盘上必须各有一枚帅/将。"}</p>
+          <ul>
+            <li>为什么</li>
+            <li>更好的选择</li>
+            <li>棋理建议</li>
+          </ul>
+        </article>`;
+    }
+    if (!editing && !replay && lines.length) {
+      coachHtml += `<div class="candidate-list">
+        ${lines.map((line, index) => `
+          <button type="button" class="candidate-row${index === selectedLine ? " active" : ""}" data-candidate="${index}">
+            <span class="candidate-rank">${index + 1}</span>
+            <strong>${escapeHtml(line.notation)}${(line.pvText || []).slice(1).length ? `<small>${escapeHtml(line.pvText.slice(1).join(" "))}</small>` : ""}</strong>
+            <span class="candidate-score">${escapeHtml(line.score)}</span>
+          </button>
+        `).join("")}
+      </div>
+      <button type="button" class="button button-primary route-preview-trigger" data-play-best>走首选</button>`;
+    }
+
+    const moveCount = Math.max(0, nodes.length - 1);
+    const moveRows = [];
+    for (let index = 1; index < nodes.length; index += 2) {
+      const red = nodes[index];
+      const black = nodes[index + 1];
+      moveRows.push(`<div class="move-row">
+        <span class="move-number">${Math.ceil(index / 2)}.</span>
+        <button type="button" class="red-move${cursor === index ? " active" : ""}" data-goto="${index}">${escapeHtml(red?.notation || "")}</button>
+        ${black
+          ? `<button type="button" class="black-move${cursor === index + 1 ? " active" : ""}" data-goto="${index + 1}">${escapeHtml(black.notation || "")}</button>`
+          : `<span class="black-move"></span>`}
+      </div>`);
+    }
+    const lastLabel = nodes[cursor]?.notation
+      ? `${nodes[cursor].color === "red" ? "红" : "黑"} ${nodes[cursor].notation}`
+      : (editing ? "点棋盘放子，或从左侧选子" : "请选择一个棋子开始");
 
     root.innerHTML = `
-      <div class="platform-page-header">
-        <div>
-          <span class="eyebrow">ANALYSIS · 棋盘分析</span>
-          <h1>把一个局面放上来研究</h1>
-          <p>截图或手动摆盘都可以。先核对棋盘，再让 Pikafish 看这一手。</p>
-        </div>
-        <span>${phase === "result" ? "可以试走" : "先摆盘"}</span>
-      </div>
-      <div class="analysis-workbench">
-        <section class="platform-surface analysis-board-shell">
-          <div class="analysis-tray">
-            ${trayHtml}
-            <div class="analysis-tray-row">
-              <button type="button" class="analysis-tool${tray === "erase" ? " active" : ""}" data-tray-erase>橡皮</button>
-              <button type="button" class="analysis-tool" data-setup-start>标准开局</button>
-              <button type="button" class="analysis-tool" data-setup-empty>空棋盘</button>
-              <button type="button" class="analysis-tool" data-flip-view>翻转视角</button>
+      <aside class="panel left-panel">
+        <section>
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">局面研究</span>
+              <h2>分析</h2>
+            </div>
+            <span class="status-badge">${editing ? "摆盘" : sideToMove === "red" ? "红方走棋" : "黑方走棋"}</span>
+          </div>
+          ${editing ? `<div class="analysis-tray">${trayHtml}
+            <button type="button" class="analysis-tool${tray === "erase" ? " active" : ""}" data-tray-erase>橡皮</button>
+          </div>` : `<div class="analysis-toggle-row">
+            <div>
+              <strong>轮到谁走</strong>
+              <span>引擎按这一方计算</span>
             </div>
           </div>
-          <div class="analysis-xiangqi-board" aria-label="分析棋盘">
-            <svg class="analysis-board-lines" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true">
-              <g>
-                <line x1="0" y1="0" x2="800" y2="0" /><line x1="0" y1="100" x2="800" y2="100" /><line x1="0" y1="200" x2="800" y2="200" />
-                <line x1="0" y1="300" x2="800" y2="300" /><line x1="0" y1="400" x2="800" y2="400" /><line x1="0" y1="500" x2="800" y2="500" />
-                <line x1="0" y1="600" x2="800" y2="600" /><line x1="0" y1="700" x2="800" y2="700" /><line x1="0" y1="800" x2="800" y2="800" />
-                <line x1="0" y1="900" x2="800" y2="900" /><line x1="0" y1="0" x2="0" y2="900" /><line x1="800" y1="0" x2="800" y2="900" />
-                <line x1="100" y1="0" x2="100" y2="400" /><line x1="100" y1="500" x2="100" y2="900" />
-                <line x1="200" y1="0" x2="200" y2="400" /><line x1="200" y1="500" x2="200" y2="900" />
-                <line x1="300" y1="0" x2="300" y2="400" /><line x1="300" y1="500" x2="300" y2="900" />
-                <line x1="400" y1="0" x2="400" y2="400" /><line x1="400" y1="500" x2="400" y2="900" />
-                <line x1="500" y1="0" x2="500" y2="400" /><line x1="500" y1="500" x2="500" y2="900" />
-                <line x1="600" y1="0" x2="600" y2="400" /><line x1="600" y1="500" x2="600" y2="900" />
-                <line x1="700" y1="0" x2="700" y2="400" /><line x1="700" y1="500" x2="700" y2="900" />
-                <line x1="300" y1="0" x2="500" y2="200" /><line x1="500" y1="0" x2="300" y2="200" />
-                <line x1="300" y1="700" x2="500" y2="900" /><line x1="500" y1="700" x2="300" y2="900" />
-              </g>
-              <text x="175" y="470">楚 河</text>
-              <text x="625" y="470">汉 界</text>
-            </svg>
-            <div class="analysis-board-points">${points.join("")}</div>
+          <div class="analysis-turn-switch">
+            <button type="button" class="${sideToMove === "red" ? "active" : ""}" data-side="red">红走</button>
+            <button type="button" class="${sideToMove === "black" ? "active" : ""}" data-side="black">黑走</button>
+          </div>`}
+          <label class="analysis-dropzone${recognizing ? " dragover" : ""}" data-dropzone>
+            ${screenshotUrl ? `<img class="analysis-preview" alt="棋盘截图" src="${screenshotUrl}">` : "<strong>粘贴截图填盘</strong>"}
+            <input id="analysisScreenshotInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+          </label>
+          ${screenshotNote ? `<p class="analysis-warning">${escapeHtml(screenshotNote)}</p>` : ""}
+        </section>
+
+        <section class="history-section">
+          <div class="section-heading compact">
+            <div>
+              <span class="eyebrow">本局记录</span>
+              <h2>本局棋谱</h2>
+            </div>
+            <span class="muted-count">${moveCount} 手</span>
           </div>
-          <div class="analysis-board-toolbar">
-            <button type="button" class="button button-ghost" data-edit-board>${phase === "result" ? "继续改局面" : "摆盘中"}</button>
-            ${history.length ? '<button type="button" class="button button-ghost" data-undo-try>撤消试走</button>' : ""}
+          <div class="move-history${moveRows.length ? "" : " empty-state"}">
+            ${moveRows.length ? moveRows.join("") : "还没有试走。直接在棋盘上走，或点引擎首选。"}
           </div>
         </section>
-        <aside class="platform-surface analysis-side">
-          <div class="analysis-side-block">
-            <span class="eyebrow">放上局面</span>
-            <h2>截图填盘</h2>
-            <label class="analysis-dropzone${recognizing ? " dragover" : ""}" data-dropzone>
-              ${screenshotUrl ? `<img class="analysis-preview" alt="上传的棋盘截图" src="${screenshotUrl}">` : "<strong>拖进来、点选，或直接粘贴截图</strong>"}
-              <span>识别后请核对虚线标出的可疑子。分析不会在核对前自动开始。</span>
-              <input id="analysisScreenshotInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
-            </label>
-            ${screenshotNote ? `<p class="analysis-warning">${escapeHtml(screenshotNote)}</p>` : ""}
+
+        <div class="left-actions">
+          ${editing ? `
+            <button type="button" class="button button-primary action-wide" data-toggle-edit>完成摆盘</button>
+            <button type="button" class="button button-secondary" data-setup-start>标准开局</button>
+            <button type="button" class="button button-ghost" data-setup-empty>空棋盘</button>
+            <button type="button" class="button button-ghost" data-flip-view>翻转</button>
+          ` : `
+            <button type="button" class="button button-primary" data-takeback ${cursor === 0 ? "disabled" : ""}>悔棋</button>
+            <button type="button" class="button button-ghost" data-step="-1" ${cursor === 0 ? "disabled" : ""}>上一步</button>
+            <button type="button" class="button button-ghost" data-step="1" ${cursor >= nodes.length - 1 ? "disabled" : ""}>下一步</button>
+            <button type="button" class="button button-ghost" data-goto="0">重来</button>
+            <button type="button" class="button button-ghost" data-flip-view>翻转</button>
+            <button type="button" class="button button-ghost" data-toggle-edit>摆盘</button>
+          `}
+        </div>
+      </aside>
+
+      <section class="board-column">
+        <div class="board-toolbar">
+          <div>
+            <span class="turn-dot ${sideToMove}"></span>
+            <strong>${sideToMove === "red" ? "轮到红方" : "轮到黑方"}</strong>
           </div>
-          <div class="analysis-side-block">
-            <span class="eyebrow">核对</span>
-            <h2>轮到谁走</h2>
-            <div class="analysis-turn-switch">
-              <button type="button" class="${sideToMove === "red" ? "active" : ""}" data-side="red">红方</button>
-              <button type="button" class="${sideToMove === "black" ? "active" : ""}" data-side="black">黑方</button>
+          <div class="evaluation-pill">
+            <span>${analyzing ? "计算中" : evalLabel(scoreCp)}</span>
+            <strong>${analyzing ? "…" : escapeHtml(formatScore(scoreCp))}</strong>
+          </div>
+        </div>
+
+        <div class="board-area">
+          <div class="analysis-board-cluster">
+            <div class="analysis-eval-bar ${redAhead ? "red-ahead" : "black-ahead"}" aria-label="评估条">
+              <i style="height:${topPct}%"></i>
+              <span>${analyzing ? "…" : escapeHtml(formatScore(scoreCp))}</span>
             </div>
-            <p class="analysis-note">${generals.red === 1 && generals.black === 1 ? "双方将帅都在。" : "棋盘上必须各有一枚帅/将，才能开始分析。"}</p>
-            <button type="button" class="button button-primary" data-start-analysis ${canAnalyze ? "" : "disabled"}>${analyzing ? "Pikafish 计算中…" : "开始分析"}</button>
+            <div class="xiangqi-board" aria-label="分析棋盘">
+              <svg class="board-lines" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true">
+                <g class="grid-lines">
+                  <line x1="0" y1="0" x2="800" y2="0" /><line x1="0" y1="100" x2="800" y2="100" /><line x1="0" y1="200" x2="800" y2="200" />
+                  <line x1="0" y1="300" x2="800" y2="300" /><line x1="0" y1="400" x2="800" y2="400" /><line x1="0" y1="500" x2="800" y2="500" />
+                  <line x1="0" y1="600" x2="800" y2="600" /><line x1="0" y1="700" x2="800" y2="700" /><line x1="0" y1="800" x2="800" y2="800" />
+                  <line x1="0" y1="900" x2="800" y2="900" /><line x1="0" y1="0" x2="0" y2="900" /><line x1="800" y1="0" x2="800" y2="900" />
+                  <line x1="100" y1="0" x2="100" y2="400" /><line x1="100" y1="500" x2="100" y2="900" />
+                  <line x1="200" y1="0" x2="200" y2="400" /><line x1="200" y1="500" x2="200" y2="900" />
+                  <line x1="300" y1="0" x2="300" y2="400" /><line x1="300" y1="500" x2="300" y2="900" />
+                  <line x1="400" y1="0" x2="400" y2="400" /><line x1="400" y1="500" x2="400" y2="900" />
+                  <line x1="500" y1="0" x2="500" y2="400" /><line x1="500" y1="500" x2="500" y2="900" />
+                  <line x1="600" y1="0" x2="600" y2="400" /><line x1="600" y1="500" x2="600" y2="900" />
+                  <line x1="700" y1="0" x2="700" y2="400" /><line x1="700" y1="500" x2="700" y2="900" />
+                  <line x1="300" y1="0" x2="500" y2="200" /><line x1="500" y1="0" x2="300" y2="200" />
+                  <line x1="300" y1="700" x2="500" y2="900" /><line x1="500" y1="700" x2="300" y2="900" />
+                </g>
+                <text x="175" y="470" class="river-label">楚 河</text>
+                <text x="625" y="470" class="river-label">汉 界</text>
+              </svg>
+              ${editing || !arrowMove ? "" : renderArrow(arrowMove)}
+              <div class="board-points">${points.join("")}</div>
+            </div>
           </div>
-          <div class="analysis-side-block">
-            <span class="eyebrow">这一手</span>
-            <h2>分析结果</h2>
-            ${resultHtml}
+        </div>
+
+        <div class="board-footer">
+          <div class="board-footer-play${replay ? " hidden" : ""}">
+            <span>${escapeHtml(lastLabel)}</span>
           </div>
-        </aside>
-      </div>
+          <div class="board-replay-bar${replay ? "" : " hidden"}">
+            <div class="board-replay-copy">
+              <span class="eyebrow">变化演示</span>
+              <strong>${escapeHtml(replay?.title || "你的路线")}</strong>
+              <span>${escapeHtml(replayStep?.notation || "起始局面")}</span>
+            </div>
+            <div class="board-replay-tabs">
+              <button id="analysisReplayYour" class="button button-ghost${replay?.key === "your" ? " active" : ""}" type="button">你的路线</button>
+              <button id="analysisReplayBest" class="button button-ghost${replay?.key === "best" ? " active" : ""}${coachAnalysis?.sameRoute ? " hidden" : ""}" type="button">最佳路线</button>
+            </div>
+            <div class="board-replay-controls">
+              <button id="analysisReplayPrev" class="button button-ghost" type="button" ${replay && replay.index === 0 ? "disabled" : ""}>上一步</button>
+              <output>${replay ? `${replay.index} / ${replay.route.steps.length}` : "0 / 0"}</output>
+              <button id="analysisReplayNext" class="button button-primary" type="button" ${replay && replay.index >= replay.route.steps.length ? "disabled" : ""}>下一步</button>
+              <button id="analysisReplayClose" class="button button-ghost" type="button">退出</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel coach-panel">
+        <div class="coach-header">
+          <div class="coach-avatar">AI</div>
+          <div>
+            <span class="eyebrow">每一步的解释</span>
+            <h2>AI Coach</h2>
+          </div>
+        </div>
+        <div class="coach-content">${coachHtml}</div>
+        <div class="engine-placeholder">
+          <div>
+            <span class="engine-dot"></span>
+            <strong>分析状态</strong>
+          </div>
+          <span>${analyzing ? "Pikafish 正在计算…" : analysis?.error ? "等待局面" : "Pikafish · 深度 12"}</span>
+        </div>
+      </aside>
     `;
-
+    root.classList.toggle("replay-active", Boolean(replay));
     bind();
-  }
-
-  function renderResult() {
-    if (analysis.error) {
-      return `<div class="analysis-empty">${escapeHtml(analysis.error)}</div>`;
-    }
-    const facts = (analysis.facts || []).map((fact) => `<div class="analysis-urgent"><strong>${escapeHtml(fact)}</strong></div>`).join("");
-    const lines = (analysis.lines || []).slice(0, 3).map((line, index) => {
-      const active = hintMove && line.move?.fromRow === hintMove.fromRow && line.move?.toRow === hintMove.toRow && line.move?.fromCol === hintMove.fromCol && line.move?.toCol === hintMove.toCol;
-      return `<button type="button" class="analysis-candidate${active ? " active" : ""}" data-candidate="${index}">
-        <strong>${index === 0 ? "Pikafish 首选" : `候选 ${index + 1}`} · ${line.notation}</strong>
-        <span class="analysis-score">${line.score}</span>
-        <span>点一下看起点和落点。要看变化，直接在棋盘上试走。</span>
-      </button>`;
-    }).join("");
-    const tries = history.map((item, index) => `<div class="analysis-try-row"><strong>${index + 1}. ${item.notation}</strong><span>${item.color === "red" ? "红" : "黑"}</span></div>`).join("");
-    return `${facts}${lines || '<div class="analysis-empty">引擎没有返回候选着。</div>'}${tries ? `<div class="analysis-try-list">${tries}</div>` : ""}`;
+    const explanation = root.querySelector(".coach-explanation");
+    const advanced = root.querySelector(".coach-engine");
+    if (explanation) explanation.open = explanationOpen || coachAnalysis?.pending || coachAnalysis?.aiCoach?.state === "loading";
+    if (advanced) advanced.open = advancedOpen;
   }
 
   function bind() {
@@ -338,52 +499,71 @@ if (root) {
       legalTargets = [];
       render();
     });
-    root.querySelector("[data-setup-start]")?.addEventListener("click", () => {
-      board = createInitialBoard();
-      resetAnalysis("已恢复标准开局。");
-    });
-    root.querySelector("[data-setup-empty]")?.addEventListener("click", () => {
-      board = createEmptyBoard();
-      resetAnalysis("棋盘已清空。");
-    });
-    root.querySelector("[data-flip-view]")?.addEventListener("click", () => {
-      flipped = !flipped;
-      render();
-    });
-    root.querySelector("[data-edit-board]")?.addEventListener("click", () => {
-      phase = "setup";
+    root.querySelector("[data-setup-start]")?.addEventListener("click", () => resetToBoard(createInitialBoard(), "red"));
+    root.querySelector("[data-setup-empty]")?.addEventListener("click", () => resetToBoard(createEmptyBoard(), "red"));
+    root.querySelector("[data-flip-view]")?.addEventListener("click", () => { flipped = !flipped; render(); });
+    root.querySelector("[data-toggle-edit]")?.addEventListener("click", () => {
+      editing = !editing;
+      tray = null;
       selected = null;
       legalTargets = [];
-      hintMove = null;
+      if (!editing) {
+        nodes = [{ board: cloneBoard(board), sideToMove, notation: "", color: null }];
+        cursor = 0;
+        coachRequestId += 1;
+        coachAnalysis = null;
+        replay = null;
+        void runAnalysis();
+        return;
+      }
       render();
     });
-    root.querySelector("[data-undo-try]")?.addEventListener("click", () => {
-      const previous = history.pop();
-      if (!previous) return;
-      board = previous.board;
-      sideToMove = previous.color;
-      hintMove = null;
-      void runAnalysis();
-    });
+    root.querySelector("[data-takeback]")?.addEventListener("click", takeback);
+    root.querySelector("[data-play-best]")?.addEventListener("click", () => playLine(selectedLine));
     root.querySelectorAll("[data-side]").forEach((button) => {
       button.addEventListener("click", () => {
         sideToMove = button.dataset.side;
-        if (phase === "result") void runAnalysis();
-        else render();
-      });
-    });
-    root.querySelector("[data-start-analysis]")?.addEventListener("click", () => {
-      phase = "result";
-      history = [];
-      void runAnalysis();
-    });
-    root.querySelectorAll("[data-candidate]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const line = analysis?.lines?.[Number(button.dataset.candidate)];
-        hintMove = line?.move || null;
+        nodes = [{ board: cloneBoard(board), sideToMove, notation: "", color: null }];
+        cursor = 0;
         render();
       });
     });
+    root.querySelectorAll("[data-candidate]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number(button.dataset.candidate);
+        const line = analysis?.lines?.[index];
+        if (!line) return;
+        if (selectedLine === index && line.move) {
+          playLine(index);
+          return;
+        }
+        selectedLine = index;
+        hintMove = line.move || null;
+        render();
+      });
+    });
+    root.querySelectorAll("[data-goto]").forEach((button) => {
+      button.addEventListener("click", () => {
+        restoreNode(Number(button.dataset.goto));
+        afterExploreChange();
+      });
+    });
+    root.querySelectorAll("[data-step]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const next = cursor + Number(button.dataset.step);
+        if (next < 0 || next >= nodes.length) return;
+        restoreNode(next);
+        afterExploreChange();
+      });
+    });
+    root.querySelectorAll("[data-route]").forEach((button) => {
+      button.addEventListener("click", () => openReplay(button.dataset.route));
+    });
+    root.querySelector("#analysisReplayPrev")?.addEventListener("click", () => stepReplay(-1));
+    root.querySelector("#analysisReplayNext")?.addEventListener("click", () => stepReplay(1));
+    root.querySelector("#analysisReplayClose")?.addEventListener("click", closeReplay);
+    root.querySelector("#analysisReplayYour")?.addEventListener("click", () => openReplay("your"));
+    root.querySelector("#analysisReplayBest")?.addEventListener("click", () => openReplay("best"));
 
     const dropzone = root.querySelector("[data-dropzone]");
     const input = root.querySelector("#analysisScreenshotInput");
@@ -393,10 +573,7 @@ if (root) {
       if (file) void ingestImage(file);
       input.value = "";
     });
-    dropzone?.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      dropzone.classList.add("dragover");
-    });
+    dropzone?.addEventListener("dragover", (event) => { event.preventDefault(); dropzone.classList.add("dragover"); });
     dropzone?.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
     dropzone?.addEventListener("drop", (event) => {
       event.preventDefault();
@@ -404,72 +581,161 @@ if (root) {
       const file = event.dataTransfer?.files?.[0];
       if (file) void ingestImage(file);
     });
-
     root.querySelectorAll("[data-row]").forEach((button) => {
       button.addEventListener("click", () => onSquare(Number(button.dataset.row), Number(button.dataset.col)));
     });
   }
 
-  function resetAnalysis(note = "") {
-    phase = "setup";
+  function resetToBoard(next, side = "red") {
+    board = next;
+    sideToMove = side;
+    nodes = [{ board: cloneBoard(board), sideToMove, notation: "", color: null }];
+    cursor = 0;
     selected = null;
     legalTargets = [];
     hintMove = null;
-    suspects = new Set();
     analysis = null;
-    history = [];
-    if (note) screenshotNote = note;
+    coachRequestId += 1;
+    coachAnalysis = null;
+    replay = null;
+    suspects = new Set();
+    editing = false;
     render();
+    void runAnalysis();
+  }
+
+  function takeback() {
+    if (cursor <= 0) return;
+    if (cursor === nodes.length - 1) nodes.pop();
+    restoreNode(nodes.length - 1);
+    afterExploreChange();
+  }
+
+  function playLine(index) {
+    const line = analysis?.lines?.[index];
+    if (!line?.move || editing) return;
+    const notation = line.notation || formatMove(line.move, board);
+    pushMove(line.move, notation);
+    selectedLine = 0;
+    afterExploreChange();
+  }
+
+  function afterExploreChange() {
+    replay = null;
+    void runAnalysis();
+    if (!editing && cursor > 0 && nodes[cursor]?.move) {
+      void runCoach(nodes[cursor - 1].board, nodes[cursor].move);
+    } else {
+      coachRequestId += 1;
+      coachAnalysis = null;
+    }
+  }
+
+  function previewReplayBoard() {
+    if (!replay) return board;
+    let working = cloneBoard(replay.sourceBoard);
+    for (let index = 0; index < replay.index; index += 1) {
+      const step = replay.route.steps[index];
+      if (!step?.move) break;
+      working = applyLegalMove(working, step.move);
+    }
+    return working;
+  }
+
+  function openReplay(routeKey) {
+    const route = coachAnalysis?.routes?.[routeKey];
+    if (!route?.steps?.length || !coachAnalysis?.sourceBoard) return;
+    replay = {
+      key: routeKey,
+      route,
+      index: 1,
+      title: routeKey === "best" ? "最佳路线" : "你的路线",
+      sourceBoard: cloneBoard(coachAnalysis.sourceBoard),
+    };
+    render();
+  }
+
+  function closeReplay() {
+    if (!replay) return;
+    replay = null;
+    render();
+  }
+
+  function stepReplay(delta) {
+    if (!replay) return;
+    replay.index = Math.max(0, Math.min(replay.route.steps.length, replay.index + delta));
+    render();
+  }
+
+  async function runCoach(sourceBoard, move) {
+    const tools = window.QiliReviewCoach;
+    const requestId = ++coachRequestId;
+    coachAnalysis = { pending: true, moveNotation: formatMove(move, sourceBoard) };
+    render();
+    if (!tools?.analyzeMove) {
+      coachAnalysis = { error: "AI Coach 尚未加载。" };
+      render();
+      return;
+    }
+    try {
+      const built = await tools.analyzeMove(sourceBoard, move, { depth: 12, routeLimit: 8 });
+      if (requestId !== coachRequestId) return;
+      built.aiCoach = { state: "loading" };
+      coachAnalysis = built;
+      window.QiliLearn?.ingestAnalysis?.(built);
+      render();
+      try {
+        const ai = await tools.explain(built, "play");
+        if (requestId !== coachRequestId) return;
+        built.aiCoach = { state: "ready", ...ai };
+      } catch (error) {
+        if (requestId !== coachRequestId) return;
+        built.aiCoach = error?.reason
+          ? { state: "unavailable", reason: error.reason }
+          : { state: "error", message: error instanceof Error ? error.message : "AI教练请求失败" };
+      }
+      render();
+    } catch (error) {
+      if (requestId !== coachRequestId) return;
+      coachAnalysis = { error: error instanceof Error ? error.message : "讲解失败" };
+      render();
+    }
   }
 
   function onSquare(row, col) {
-    if (phase === "result" && !tray) {
-      onTrySquare(row, col);
-      return;
-    }
-
-    if (tray === "erase") {
-      board[row][col] = null;
-      suspects.delete(`${row},${col}`);
-      analysis = null;
+    if (replay) return;
+    if (editing || tray) {
+      if (tray === "erase") {
+        board[row][col] = null;
+        suspects.delete(`${row},${col}`);
+        render();
+        return;
+      }
+      if (tray) {
+        board[row][col] = piece(tray.type, tray.color);
+        suspects.delete(`${row},${col}`);
+        render();
+        return;
+      }
+      const entry = board[row][col];
+      if (selected && (selected.row !== row || selected.col !== col)) {
+        board[row][col] = board[selected.row][selected.col];
+        board[selected.row][selected.col] = null;
+        selected = null;
+        render();
+        return;
+      }
+      selected = entry ? { row, col } : null;
       render();
       return;
     }
 
-    if (tray) {
-      board[row][col] = piece(tray.type, tray.color);
-      suspects.delete(`${row},${col}`);
-      analysis = null;
-      render();
-      return;
-    }
-
-    const entry = board[row][col];
-    if (selected && (selected.row !== row || selected.col !== col)) {
-      board[row][col] = board[selected.row][selected.col];
-      board[selected.row][selected.col] = null;
-      selected = null;
-      analysis = null;
-      render();
-      return;
-    }
-    selected = entry ? { row, col } : null;
-    render();
-  }
-
-  function onTrySquare(row, col) {
     const entry = board[row][col];
     if (selected) {
       const move = legalTargets.find((item) => item.toRow === row && item.toCol === col);
       if (move) {
-        const notation = formatMove(move, board);
-        history.push({ board: cloneBoard(board), color: sideToMove, notation });
-        board = applyLegalMove(board, move);
-        sideToMove = sideToMove === "red" ? "black" : "red";
-        selected = null;
-        legalTargets = [];
-        hintMove = { fromRow: move.fromRow, fromCol: move.fromCol, toRow: move.toRow, toCol: move.toCol };
-        void runAnalysis();
+        pushMove(move, formatMove(move, board));
+        afterExploreChange();
         return;
       }
     }
@@ -497,15 +763,16 @@ if (root) {
   async function ingestImage(file) {
     if (!file?.type?.startsWith("image/")) {
       screenshotNote = "请上传棋盘截图。";
+      editing = true;
       render();
       return;
     }
     recognizing = true;
+    editing = true;
     screenshotNote = "正在识别棋盘，请稍候…";
     render();
     try {
       const dataUrl = await fileToImage(file);
-      if (screenshotUrl) URL.revokeObjectURL(screenshotUrl);
       screenshotUrl = dataUrl;
       const response = await fetch(`${API}/api/coach/recognize-board`, {
         method: "POST",
@@ -518,12 +785,15 @@ if (root) {
       if (payload.sideToMove === "red" || payload.sideToMove === "black") sideToMove = payload.sideToMove;
       flipped = payload.redAtBottom === false;
       suspects = new Set((payload.pieces || []).filter((item) => Number(item.confidence) < 0.72).map((item) => `${item.row},${item.col}`));
-      phase = "setup";
+      nodes = [{ board: cloneBoard(board), sideToMove, notation: "", color: null }];
+      cursor = 0;
       analysis = null;
-      history = [];
       hintMove = null;
+      coachRequestId += 1;
+      coachAnalysis = null;
+      replay = null;
       const warnings = payload.warnings?.length ? payload.warnings.join(" ") : "";
-      screenshotNote = `请核对棋盘后再分析。识别把握：${payload.confidence || "low"}。${warnings}`;
+      screenshotNote = `请核对棋盘后再开始研究。识别把握：${payload.confidence || "low"}。${warnings}`;
     } catch (error) {
       screenshotNote = error instanceof Error ? error.message : "截图识别失败，请手动摆盘。";
     } finally {
@@ -536,6 +806,7 @@ if (root) {
     const generals = countGenerals(board);
     if (generals.red !== 1 || generals.black !== 1) {
       analysis = { error: "棋盘上必须各有一枚帅和将。" };
+      hintMove = null;
       render();
       return;
     }
@@ -546,6 +817,7 @@ if (root) {
     }
     const current = ++requestId;
     analyzing = true;
+    selectedLine = 0;
     render();
     try {
       const result = await engine.analyze(board, sideToMove, { depth: 12, multiPv: 3 });
@@ -554,13 +826,12 @@ if (root) {
         move: line.parsedMove,
         notation: formatMove(line.parsedMove, board),
         score: formatScore(line.numericScore),
+        numericScore: line.numericScore,
+        pvText: formatPv(board, sideToMove, line.pv || [line.move]),
       }));
-      analysis = {
-        facts: urgentFacts(board, sideToMove),
-        lines,
-      };
+      analysis = { lines };
       hintMove = lines[0]?.move || null;
-      phase = "result";
+      selectedLine = 0;
     } catch (error) {
       if (current !== requestId) return;
       analysis = { error: error instanceof Error ? error.message : "分析失败" };
@@ -579,5 +850,24 @@ if (root) {
     }
   });
 
+  document.addEventListener("keydown", (event) => {
+    if (root.classList.contains("hidden") || editing) return;
+    if (replay) {
+      if (event.key === "ArrowLeft") stepReplay(-1);
+      if (event.key === "ArrowRight") stepReplay(1);
+      if (event.key === "Escape") closeReplay();
+      return;
+    }
+    if (event.key === "ArrowLeft" && cursor > 0) {
+      restoreNode(cursor - 1);
+      afterExploreChange();
+    }
+    if (event.key === "ArrowRight" && cursor < nodes.length - 1) {
+      restoreNode(cursor + 1);
+      afterExploreChange();
+    }
+  });
+
   render();
+  void runAnalysis();
 }

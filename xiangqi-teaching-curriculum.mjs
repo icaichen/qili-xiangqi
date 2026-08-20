@@ -123,6 +123,7 @@ const QILI_CURRICULUM_STAGE_1_5 = [
       courseLesson("palace-river", "九宫与楚河汉界为什么重要", "帅的城堡和中间的大河", "认识双方九宫与河界，作为后续将帅、仕相和兵卒规则的地图基础。", ["board-intersections"], "指出双方九宫与河界，4/4。"),
       courseLesson("turn-and-capture", "轮流走、占位与吃子", "轮到谁？怎么把对方棋拿掉？", "理解一次走一枚、不能落到己方棋上、吃子后占据对方原位置。", ["board-intersections"], "3 个判断 + 2 次实际吃子，5/5。", ["capture"]),
       courseLesson("initial-setup", "初始局面怎么摆", "把大家送回自己的位置", "认识完整初始布局，不要求第一次死背。", ["board-intersections"], "补回 4 枚缺失棋子，4/4。"),
+      courseLesson("notation-basics", "记谱怎么读", "棋盘上的地址", "理解棋子、路、进退平，能在棋盘上找到红方二路。", ["board-intersections"], "指出红方二路，1/1。"),
     ],
   },
   {
@@ -292,6 +293,39 @@ const QILI_CURRICULUM_STAGE_6_10 = [
 ];
 
 const QILI_CURRICULUM_STAGES = [...QILI_CURRICULUM_STAGE_1_5, ...QILI_CURRICULUM_STAGE_6_10];
+
+const SKILL_CATEGORIES = [
+  {
+    id: "foundations",
+    title: "基础",
+    summary: "棋盘、走法与记谱。先把规则走对，再谈好坏。",
+    stageIds: ["game-model", "legal-moves"],
+  },
+  {
+    id: "tactics",
+    title: "战术",
+    summary: "看见攻击、保护、交换，以及将杀与基本战术。",
+    stageIds: ["board-awareness", "safety-exchange", "checkmate", "tactics"],
+  },
+  {
+    id: "strategy",
+    title: "棋理",
+    summary: "候选着、对手回应，以及每手该检查什么。",
+    stageIds: ["calculation", "full-game"],
+  },
+  {
+    id: "opening",
+    title: "开局",
+    summary: "出子、协调与将帅安全，不靠死背棋谱。",
+    stageIds: ["opening"],
+  },
+  {
+    id: "endgame",
+    title: "残局",
+    summary: "把优势变成胜势，劣势时保留抵抗。",
+    stageIds: ["endgame"],
+  },
+];
 
 const MASTERY_MODEL = {
   introduced: { label: "已接触", description: "看过示例并完成第一次引导题。" },
@@ -472,5 +506,5 @@ function curriculumPrompt(caseData) {
   };
 }
 
-export { MASTERY_MODEL, QILI_CONCEPT_INDEX, QILI_CURRICULUM_STAGES, REVIEW_CONCEPT_MAP, getCurriculumConcept, getReviewTrainingRoute };
+export { MASTERY_MODEL, QILI_CONCEPT_INDEX, QILI_CURRICULUM_STAGES, SKILL_CATEGORIES, REVIEW_CONCEPT_MAP, getCurriculumConcept, getReviewTrainingRoute };
 export { ADULT_LEARN_STAGES, KIDS_CHAPTERS, XIANGQI_BEGINNER_CURRICULUM, PRIORITY, selectTeachingFocus, curriculumPrompt };

@@ -838,6 +838,18 @@ async function analyzeHumanMoveInBackground(sourceBoard, afterHumanBoard, move) 
     const before = await engineClient.analyze(sourceBoard, COLORS.RED, { depth: coachDepth, multiPv: 4, maxTimeMs: 500 });
     const after = await engineClient.analyze(afterHumanBoard, COLORS.BLACK, { depth: coachDepth, multiPv: 2, maxTimeMs: 350 });
     coachAnalysis = buildCoachAnalysis(sourceBoard, move, before, after);
+    if (window.QiliLearn?.ingestAnalysis) window.QiliLearn.ingestAnalysis(coachAnalysis);
+    else {
+      const types = [...(coachAnalysis.chosenFacts || []), ...(coachAnalysis.replyFacts || [])].map((item) => item.type).filter(Boolean);
+      if (types.length) {
+        localStorage.setItem("qili-learn-signals-v1", JSON.stringify({
+          at: Date.now(),
+          types: [...new Set(types)].slice(0, 8),
+          moveNotation: coachAnalysis.moveNotation || "",
+          gap: coachAnalysis.gap,
+        }));
+      }
+    }
     requestAiCoachExplanation(coachAnalysis);
     renderCoach();
   } catch (error) {
@@ -1142,7 +1154,7 @@ function buildAiCoachCase(analysis, mode = "play") {
   };
 }
 
-async function analyzeReviewPosition(sourceBoard, move, options = {}) {
+async function analyzeMoveEngine(sourceBoard, move, options = {}) {
   if (!engineConnected && !(await initializeEngine())) {
     throw new Error(engineError || "Pikafish 连接失败");
   }
@@ -1153,12 +1165,30 @@ async function analyzeReviewPosition(sourceBoard, move, options = {}) {
   const before = await engineClient.analyze(sourceBoard, mover.color, { depth, multiPv: 8 });
   const afterBoard = applyMove(sourceBoard, move).board;
   const after = await engineClient.analyze(afterBoard, OPPOSITE[mover.color], { depth, multiPv: 3 });
-  const analysis = buildCoachAnalysis(sourceBoard, move, before, after, { routeLimit });
+  return buildCoachAnalysis(sourceBoard, move, before, after, { routeLimit });
+}
+
+async function explainCoachAnalysis(analysis, mode = "play") {
+  if (!aiCoachServerAvailable) {
+    const error = new Error("AI 解释服务正在更新，请稍后重试。");
+    error.reason = "restart";
+    throw error;
+  }
+  if (!aiCoachConfigured) {
+    const error = new Error("AI 解释暂时不可用。先看棋盘变化，再对比更好的选择。");
+    error.reason = "key";
+    throw error;
+  }
+  return engineClient.explainCoach(buildAiCoachCase(analysis, mode === "review" ? "review" : "play"));
+}
+
+async function analyzeReviewPosition(sourceBoard, move, options = {}) {
+  const analysis = await analyzeMoveEngine(sourceBoard, move, options);
   let ai = null;
   let aiError = null;
   if (aiCoachServerAvailable && aiCoachConfigured) {
     try {
-      ai = await engineClient.explainCoach(buildAiCoachCase(analysis, "review"));
+      ai = await explainCoachAnalysis(analysis, options.mode === "play" ? "play" : "review");
     } catch (error) {
       aiError = error instanceof Error ? error.message : "AI 复盘解释失败";
     }
@@ -1601,6 +1631,12 @@ function closeRoutePreview() {
 
 window.QiliReviewCoach = {
   analyzePosition: analyzeReviewPosition,
+  analyzeMove: analyzeMoveEngine,
+  explain: explainCoachAnalysis,
+  panelHtml(analysis) {
+    return moveSummaryCardHtml(analysis) + explanationCardHtml(analysis) + engineDetailsHtml(analysis);
+  },
+  emptyHtml: emptyCoachHtml,
   openRoutePreview: openExternalRoutePreview,
 };
 
@@ -1718,6 +1754,7 @@ function switchPlatformView(viewName) {
   document.querySelector(".play-only-action")?.classList.toggle("hidden", target !== "play");
   quickPlayButtonElement?.classList.toggle("hidden", target === "play" || target === "online");
   document.body.classList.toggle("play-mode", target === "play");
+  document.body.classList.toggle("analysis-mode", target === "analysis");
   document.body.classList.toggle("online-mode", target === "online");
   if (target === "online") {
     const table = document.querySelector("#onlineGame");

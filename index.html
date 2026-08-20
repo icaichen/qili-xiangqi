@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/kids.css" />
     <link rel="stylesheet" href="/analysis.css" />
     <link rel="stylesheet" href="/play-layout-v2.css" />
+    <link rel="stylesheet" href="/learn.css" />
   </head>
   <body>
     <div class="app-shell">
@@ -30,7 +31,7 @@
           <button class="platform-nav-item active" data-view="home">首页</button>
           <button class="platform-nav-item" data-view="play">下棋</button>
           <button class="platform-nav-item" data-view="train">训练</button>
-          <button class="platform-nav-item" data-view="learn">学习</button>
+          <button class="platform-nav-item" data-view="learn">学习中心</button>
           <button class="platform-nav-item" data-view="review">复盘</button>
           <button class="platform-nav-item" data-view="analysis">分析</button>
           <button class="platform-nav-item" data-view="profile">我的</button>
@@ -50,12 +51,12 @@
           </section>
           <section class="home-action-grid">
             <article class="home-action-card"><b>棋</b><span class="eyebrow">立即开始</span><h2>下棋</h2><p>真人快速匹配和私人房间已经开放；也可以继续使用本地 Pikafish 人机对弈。</p><button class="button button-primary platform-jump" data-target-view="online">真人在线</button></article>
-            <article class="home-action-card"><b>题</b><span class="eyebrow">训练</span><h2>针对弱点练题</h2><p>未来从你的真实错着生成训练队列，不做随机刷题。</p><button class="button button-ghost platform-jump" data-target-view="train">训练规划</button></article>
-            <article class="home-action-card"><b>学</b><span class="eyebrow">课程</span><h2>分级学习</h2><p>从规则、吃子、将军、保护与交换，一步步学到基础布局。</p><button class="button button-ghost platform-jump" data-target-view="learn">学习路径</button></article>
+            <article class="home-action-card"><b>学</b><span class="eyebrow">学习中心</span><h2>下一课该练什么</h2><p>从规则、保护、交换到基本战术。有对局之后，会优先补你刚暴露的漏洞。</p><button class="button button-ghost platform-jump" data-target-view="learn">打开学习中心</button></article>
+            <article class="home-action-card"><b>盘</b><span class="eyebrow">复盘</span><h2>看懂自己的棋</h2><p>用真实对局找到关键失误，而不是刷一本无关的课程。</p><button class="button button-ghost platform-jump" data-target-view="review">去复盘</button></article>
           </section>
           <section class="home-lower-grid">
             <article class="platform-surface home-status-card"><span class="eyebrow">你的成长</span><h2>能力画像</h2><p>吃子判断 · 将军识别 · 保护意识 · 交换判断</p><small>完成足够对局后才显示真实能力数据。</small></article>
-            <article class="platform-surface home-status-card"><span class="eyebrow">平台状态</span><h2>当前可用</h2><p>✓ 真人快速匹配<br>✓ 私人房间对弈<br>✓ 本地 Pikafish 人机对弈<br>○ 个性化题库</p></article>
+            <article class="platform-surface home-status-card"><span class="eyebrow">平台状态</span><h2>当前可用</h2><p>✓ 真人快速匹配<br>✓ 私人房间对弈<br>✓ 学习中心（可练习课）<br>✓ 本地 Pikafish 人机对弈</p></article>
           </section>
         </div>
       </section>
@@ -465,7 +466,7 @@
         </div>
       </section>
 
-      <section id="learnView" class="platform-view platform-page hidden"><div class="platform-page-header"><div><span class="eyebrow">LEARN</span><h1>学习中国象棋</h1><p>按照初学者真正需要掌握的顺序学习。</p></div><button class="button button-ghost" id="learnNotationButton">先学记谱</button></div><div class="curriculum-grid"></div><div id="curriculumDetail" class="platform-surface curriculum-detail hidden"></div></section>
+      <section id="learnView" class="platform-view learn-page hidden"></section>
 
       <section id="reviewDropzone" class="review-dropzone platform-view hidden">
         <div class="drop-icon">谱</div>
@@ -473,7 +474,7 @@
         <p>第一阶段将支持粘贴中国象棋 PGN、手动摆盘和上传棋谱文件。</p>
         <button class="button button-primary" disabled>即将开放</button>
       </section>
-      <section id="analysisView" class="platform-view platform-page hidden"></section>
+      <section id="analysisView" class="workspace platform-view play-workspace hidden"></section>
       <section id="profileView" class="platform-view platform-page hidden">
         <div class="platform-page-header"><div><span class="eyebrow">PROFILE · 我的</span><h1>你的棋手档案</h1><p>游客可以直接下棋；登录后，历史棋局与 Rapid / Blitz Rating 可以在其他设备恢复。</p></div><span id="profileAccountStatus">正在建立棋手身份…</span></div>
         <div class="profile-grid">
@@ -571,6 +572,7 @@
         ["app", () => import("/app.js")],
         ["analysis-client", () => import("/analysis-client.js")],
         ["tutorial-client", () => import("/tutorial-client.js")],
+        ["learn-client", () => import("/learn-client.js")],
         ["kids-client", () => import("/kids-client.js")],
         ["auth-client", () => import("/auth-client.js")],
         ["identity-client", () => import("/identity-client.js")],

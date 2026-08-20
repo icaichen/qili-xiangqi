@@ -1,12 +1,12 @@
-/* Qili Play layout v2 — board-first workspace. Do not patch older play styles. */
+/* Qili Play / Analysis workspace — board-first. Do not patch older play styles. */
 
-body.play-mode {
+body:is(.play-mode, .analysis-mode) {
   min-width: 0;
   overflow: hidden;
   height: 100vh;
 }
 
-body.play-mode .app-shell {
+body:is(.play-mode, .analysis-mode) .app-shell {
   height: 100vh;
   min-height: 100vh;
   max-height: 100vh;
@@ -14,7 +14,7 @@ body.play-mode .app-shell {
   padding: 12px 12px 12px 210px;
 }
 
-#playView.play-workspace {
+:is(#playView, #analysisView).play-workspace {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) 340px;
   gap: 12px;
@@ -26,21 +26,21 @@ body.play-mode .app-shell {
   align-items: stretch;
 }
 
-#playView .left-panel,
-#playView .board-column,
-#playView .coach-panel {
+:is(#playView, #analysisView) .left-panel,
+:is(#playView, #analysisView) .board-column,
+:is(#playView, #analysisView) .coach-panel {
   min-height: 0;
   height: 100%;
   overflow: hidden;
 }
 
-#playView .left-panel,
-#playView .coach-panel {
+:is(#playView, #analysisView) .left-panel,
+:is(#playView, #analysisView) .coach-panel {
   overflow-y: auto;
 }
 
 /* Column 1 — game control only */
-#playView .left-panel {
+:is(#playView, #analysisView) .left-panel {
   display: flex;
   flex-direction: column;
   padding: 14px 14px 12px;
@@ -50,45 +50,45 @@ body.play-mode .app-shell {
   box-shadow: none;
 }
 
-#playView .left-panel > section:first-child {
+:is(#playView, #analysisView) .left-panel > section:first-child {
   flex: 0 0 auto;
   padding-bottom: 12px;
   border-bottom: 1px solid #ece7de;
 }
 
-#playView .left-panel .section-heading {
+:is(#playView, #analysisView) .left-panel .section-heading {
   gap: 8px;
   margin-bottom: 10px;
 }
 
-#playView .left-panel .section-heading h2 {
+:is(#playView, #analysisView) .left-panel .section-heading h2 {
   font-size: 16px;
   font-weight: 750;
 }
 
-#playView .left-panel .field-label {
+:is(#playView, #analysisView) .left-panel .field-label {
   margin: 2px 0 6px;
   font-size: 11px;
 }
 
-#playView .left-panel .select-control {
+:is(#playView, #analysisView) .left-panel .select-control {
   min-height: 38px;
   padding: 8px 10px;
   border-radius: 8px;
 }
 
-#playView .left-panel .level-note {
+:is(#playView, #analysisView) .left-panel .level-note {
   margin-top: 6px;
   color: #9a958d;
   font-size: 9px;
   line-height: 1.4;
 }
 
-#playView .online-entry-button {
+:is(#playView, #analysisView) .online-entry-button {
   display: none !important;
 }
 
-#playView .analysis-toggle-row {
+:is(#playView, #analysisView) .analysis-toggle-row {
   margin-top: 8px;
   padding: 8px 0 0;
   border: 0;
@@ -97,20 +97,20 @@ body.play-mode .app-shell {
   background: transparent;
 }
 
-#playView .analysis-toggle-row strong {
+:is(#playView, #analysisView) .analysis-toggle-row strong {
   font-size: 12px;
 }
 
-#playView .analysis-toggle-row span {
+:is(#playView, #analysisView) .analysis-toggle-row span {
   font-size: 9px;
   line-height: 1.35;
 }
 
-#playView .hint-toggle-row {
+:is(#playView, #analysisView) .hint-toggle-row {
   background: transparent;
 }
 
-#playView .history-section {
+:is(#playView, #analysisView) .history-section {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -118,16 +118,16 @@ body.play-mode .app-shell {
   margin-top: 12px;
 }
 
-#playView .history-section .section-heading {
+:is(#playView, #analysisView) .history-section .section-heading {
   flex: 0 0 auto;
   margin-bottom: 6px;
 }
 
-#playView .history-section h2 {
+:is(#playView, #analysisView) .history-section h2 {
   font-size: 14px;
 }
 
-#playView .move-history {
+:is(#playView, #analysisView) .move-history {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
@@ -140,33 +140,33 @@ body.play-mode .app-shell {
   scrollbar-width: thin;
 }
 
-#playView .move-history.empty-state {
+:is(#playView, #analysisView) .move-history.empty-state {
   padding: 16px 8px;
   font-size: 11px;
 }
 
-#playView .move-row {
+:is(#playView, #analysisView) .move-row {
   padding: 7px 2px;
   font-size: 11px;
 }
 
-#playView .left-actions {
+:is(#playView, #analysisView) .left-actions {
   flex: 0 0 auto;
   gap: 6px;
   margin-top: 10px;
 }
 
-#playView .left-actions .button {
+:is(#playView, #analysisView) .left-actions .button {
   padding: 8px 8px;
   font-size: 11px;
 }
 
-#playView .left-actions .hidden {
+:is(#playView, #analysisView) .left-actions .hidden {
   display: none !important;
 }
 
 /* Column 2 — board is the product */
-#playView .board-column {
+:is(#playView, #analysisView) .board-column {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -177,22 +177,22 @@ body.play-mode .app-shell {
   box-shadow: none;
 }
 
-#playView .board-toolbar,
-#playView .board-footer {
+:is(#playView, #analysisView) .board-toolbar,
+:is(#playView, #analysisView) .board-footer {
   flex: 0 0 auto;
 }
 
-#playView .board-toolbar {
+:is(#playView, #analysisView) .board-toolbar {
   min-height: 36px;
   margin: 0;
   padding: 0 6px 8px;
 }
 
-#playView .board-footer {
+:is(#playView, #analysisView) .board-footer {
   padding: 8px 6px 0;
 }
 
-#playView .board-area {
+:is(#playView, #analysisView) .board-area {
   display: flex;
   flex: 1 1 0;
   align-items: center;
@@ -201,18 +201,18 @@ body.play-mode .app-shell {
   min-height: 0;
 }
 
-#playView .xiangqi-board {
+:is(#playView, #analysisView) .xiangqi-board {
   width: min(100%, calc((100vh - 120px) * 8 / 9));
   max-width: none;
   margin: 0;
 }
 
 @supports (container-type: size) {
-  #playView .board-area {
+  :is(#playView, #analysisView) .board-area {
     container-type: size;
   }
 
-  #playView .xiangqi-board {
+  :is(#playView, #analysisView) .xiangqi-board {
     width: min(100cqw, calc(100cqh * 8 / 9));
     height: auto;
     max-width: 100%;
@@ -221,7 +221,7 @@ body.play-mode .app-shell {
   }
 }
 
-#playView .replay-arrows {
+:is(#playView, #analysisView) .replay-arrows {
   position: absolute;
   inset: 6.2%;
   z-index: 4;
@@ -231,12 +231,12 @@ body.play-mode .app-shell {
   pointer-events: none;
 }
 
-#playView.replay-active .board-points {
+:is(#playView, #analysisView).replay-active .board-points {
   pointer-events: none;
 }
 
-#playView .board-point.replay-from::after,
-#playView .board-point.replay-to::after {
+:is(#playView, #analysisView) .board-point.replay-from::after,
+:is(#playView, #analysisView) .board-point.replay-to::after {
   content: "";
   position: absolute;
   inset: 9%;
@@ -244,23 +244,23 @@ body.play-mode .app-shell {
   opacity: 1;
 }
 
-#playView .board-point.replay-from::after {
+:is(#playView, #analysisView) .board-point.replay-from::after {
   background: rgba(71, 120, 216, 0.28);
 }
 
-#playView .board-point.replay-to::after {
+:is(#playView, #analysisView) .board-point.replay-to::after {
   background: rgba(237, 72, 47, 0.26);
 }
 
-#playView.replay-active .xiangqi-board {
+:is(#playView, #analysisView).replay-active .xiangqi-board {
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.36),
     0 0 0 3px rgba(237, 72, 47, 0.18),
     0 8px 20px rgba(69, 45, 24, 0.12);
 }
 
-#playView .board-footer-play,
-#playView .board-replay-bar {
+:is(#playView, #analysisView) .board-footer-play,
+:is(#playView, #analysisView) .board-replay-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -268,7 +268,7 @@ body.play-mode .app-shell {
   width: 100%;
 }
 
-#playView .board-replay-bar {
+:is(#playView, #analysisView) .board-replay-bar {
   flex-wrap: wrap;
   min-height: 42px;
   padding: 6px 8px;
@@ -277,21 +277,21 @@ body.play-mode .app-shell {
   background: #fff;
 }
 
-#playView .board-replay-bar.hidden,
-#playView .board-footer-play.hidden {
+:is(#playView, #analysisView) .board-replay-bar.hidden,
+:is(#playView, #analysisView) .board-footer-play.hidden {
   display: none;
 }
 
-#playView .board-replay-copy {
+:is(#playView, #analysisView) .board-replay-copy {
   min-width: 0;
 }
 
-#playView .board-replay-copy .eyebrow {
+:is(#playView, #analysisView) .board-replay-copy .eyebrow {
   margin-bottom: 0;
   font-size: 9px;
 }
 
-#playView .board-replay-copy strong {
+:is(#playView, #analysisView) .board-replay-copy strong {
   display: block;
   overflow: hidden;
   font-size: 13px;
@@ -299,45 +299,45 @@ body.play-mode .app-shell {
   white-space: nowrap;
 }
 
-#playView .board-replay-copy span:last-child {
+:is(#playView, #analysisView) .board-replay-copy span:last-child {
   color: #8a857d;
   font-size: 11px;
 }
 
-#playView .board-replay-tabs {
+:is(#playView, #analysisView) .board-replay-tabs {
   display: flex;
   flex: 0 0 auto;
   gap: 4px;
 }
 
-#playView .board-replay-tabs .button {
+:is(#playView, #analysisView) .board-replay-tabs .button {
   padding: 6px 9px;
   font-size: 11px;
 }
 
-#playView .board-replay-tabs .button.active {
+:is(#playView, #analysisView) .board-replay-tabs .button.active {
   color: #fff;
   border-color: var(--brand-black);
   background: var(--brand-black);
 }
 
-#playView .board-replay-tabs .hidden {
+:is(#playView, #analysisView) .board-replay-tabs .hidden {
   display: none;
 }
 
-#playView .board-replay-controls {
+:is(#playView, #analysisView) .board-replay-controls {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 6px;
 }
 
-#playView .board-replay-controls .button {
+:is(#playView, #analysisView) .board-replay-controls .button {
   padding: 6px 10px;
   font-size: 11px;
 }
 
-#playView .board-replay-controls output {
+:is(#playView, #analysisView) .board-replay-controls output {
   min-width: 48px;
   color: #6f6b64;
   font-size: 11px;
@@ -346,7 +346,7 @@ body.play-mode .app-shell {
 }
 
 /* Column 3 — coach, not a developer console */
-#playView .coach-panel {
+:is(#playView, #analysisView) .coach-panel {
   display: flex;
   flex-direction: column;
   padding: 14px 14px 12px;
@@ -357,7 +357,7 @@ body.play-mode .app-shell {
   box-shadow: none;
 }
 
-#playView .coach-header {
+:is(#playView, #analysisView) .coach-header {
   flex: 0 0 auto;
   gap: 10px;
   margin-bottom: 10px;
@@ -365,24 +365,24 @@ body.play-mode .app-shell {
   border-bottom: 1px solid #ece7de;
 }
 
-#playView .coach-avatar {
+:is(#playView, #analysisView) .coach-avatar {
   width: 32px;
   height: 32px;
   border-radius: 8px;
   font-size: 10px;
 }
 
-#playView .coach-panel h2,
-#playView .coach-panel h3,
-#playView .coach-panel strong {
+:is(#playView, #analysisView) .coach-panel h2,
+:is(#playView, #analysisView) .coach-panel h3,
+:is(#playView, #analysisView) .coach-panel strong {
   color: var(--brand-text);
 }
 
-#playView .coach-panel .eyebrow {
+:is(#playView, #analysisView) .coach-panel .eyebrow {
   color: #918c85;
 }
 
-#playView .coach-content {
+:is(#playView, #analysisView) .coach-content {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -394,40 +394,40 @@ body.play-mode .app-shell {
   scrollbar-width: thin;
 }
 
-#playView .coach-card,
-#playView .coach-empty,
-#playView .coach-explanation,
-#playView .coach-engine {
+:is(#playView, #analysisView) .coach-card,
+:is(#playView, #analysisView) .coach-empty,
+:is(#playView, #analysisView) .coach-explanation,
+:is(#playView, #analysisView) .coach-engine {
   border: 1px solid #e4dfd6;
   border-radius: 10px;
   color: #5d5953;
   background: #fff;
 }
 
-#playView .coach-card {
+:is(#playView, #analysisView) .coach-card {
   padding: 12px;
 }
 
-#playView .coach-card p,
-#playView .coach-empty p,
-#playView .coach-engine p {
+:is(#playView, #analysisView) .coach-card p,
+:is(#playView, #analysisView) .coach-empty p,
+:is(#playView, #analysisView) .coach-engine p {
   color: #77726b;
 }
 
-#playView .coach-panel .button-ghost {
+:is(#playView, #analysisView) .coach-panel .button-ghost {
   color: #4c4943;
   border-color: #d8d3ca;
   background: transparent;
 }
 
-#playView .coach-panel .button-ghost:hover,
-#playView .coach-panel .button-primary:hover {
+:is(#playView, #analysisView) .coach-panel .button-ghost:hover,
+:is(#playView, #analysisView) .coach-panel .button-primary:hover {
   color: #fff;
   border-color: var(--brand-black);
   background: var(--brand-black);
 }
 
-#playView .move-summary-card {
+:is(#playView, #analysisView) .move-summary-card {
   padding: 14px;
   animation: play-coach-in 180ms ease;
 }
@@ -437,23 +437,23 @@ body.play-mode .app-shell {
   to { opacity: 1; transform: none; }
 }
 
-#playView .move-summary-card .beginner-judgment {
+:is(#playView, #analysisView) .move-summary-card .beginner-judgment {
   margin-bottom: 8px;
 }
 
-#playView .move-summary-card h3 {
+:is(#playView, #analysisView) .move-summary-card h3 {
   margin-bottom: 6px;
   font-size: 20px;
   line-height: 1.2;
 }
 
-#playView .move-summary-card p {
+:is(#playView, #analysisView) .move-summary-card p {
   margin: 0;
   font-size: 12px;
   line-height: 1.65;
 }
 
-#playView .move-summary-card .summary-kicker {
+:is(#playView, #analysisView) .move-summary-card .summary-kicker {
   display: block;
   margin-bottom: 4px;
   color: #9a6b1f;
@@ -461,48 +461,48 @@ body.play-mode .app-shell {
   font-weight: 750;
 }
 
-#playView .move-summary-card.good {
+:is(#playView, #analysisView) .move-summary-card.good {
   border-color: #d7e7dc;
   background: #f6faf7;
 }
 
-#playView .move-summary-card.warning,
-#playView .move-summary-card.danger {
+:is(#playView, #analysisView) .move-summary-card.warning,
+:is(#playView, #analysisView) .move-summary-card.danger {
   border-color: #eadad5;
   background: #fff;
 }
 
-#playView .move-summary-card .route-preview-trigger {
+:is(#playView, #analysisView) .move-summary-card .route-preview-trigger {
   width: 100%;
   margin-top: 12px;
 }
 
-#playView .beginner-judgment.danger {
+:is(#playView, #analysisView) .beginner-judgment.danger {
   color: #9a4035;
   background: #f5dfda;
 }
 
-#playView .coach-empty {
+:is(#playView, #analysisView) .coach-empty {
   padding: 16px 14px 14px;
 }
 
-#playView .coach-empty h3 {
+:is(#playView, #analysisView) .coach-empty h3 {
   margin-bottom: 6px;
   font-size: 15px;
 }
 
-#playView .coach-empty p {
+:is(#playView, #analysisView) .coach-empty p {
   margin-bottom: 10px;
   font-size: 12px;
 }
 
-#playView .coach-empty ul {
+:is(#playView, #analysisView) .coach-empty ul {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-#playView .coach-empty li {
+:is(#playView, #analysisView) .coach-empty li {
   position: relative;
   margin-top: 6px;
   padding-left: 18px;
@@ -510,7 +510,7 @@ body.play-mode .app-shell {
   font-size: 12px;
 }
 
-#playView .coach-empty li::before {
+:is(#playView, #analysisView) .coach-empty li::before {
   content: "✓";
   position: absolute;
   left: 0;
@@ -518,14 +518,14 @@ body.play-mode .app-shell {
   font-weight: 750;
 }
 
-#playView .coach-explanation,
-#playView .coach-engine {
+:is(#playView, #analysisView) .coach-explanation,
+:is(#playView, #analysisView) .coach-engine {
   padding: 0;
   background: transparent;
 }
 
-#playView .coach-explanation > summary,
-#playView .coach-engine > summary {
+:is(#playView, #analysisView) .coach-explanation > summary,
+:is(#playView, #analysisView) .coach-engine > summary {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -538,45 +538,45 @@ body.play-mode .app-shell {
   user-select: none;
 }
 
-#playView .coach-explanation > summary::-webkit-details-marker,
-#playView .coach-engine > summary::-webkit-details-marker {
+:is(#playView, #analysisView) .coach-explanation > summary::-webkit-details-marker,
+:is(#playView, #analysisView) .coach-engine > summary::-webkit-details-marker {
   display: none;
 }
 
-#playView .coach-explanation > summary::before,
-#playView .coach-engine > summary::before {
+:is(#playView, #analysisView) .coach-explanation > summary::before,
+:is(#playView, #analysisView) .coach-engine > summary::before {
   content: "▸";
   color: #8a857d;
   font-size: 10px;
 }
 
-#playView .coach-explanation[open] > summary::before,
-#playView .coach-engine[open] > summary::before {
+:is(#playView, #analysisView) .coach-explanation[open] > summary::before,
+:is(#playView, #analysisView) .coach-engine[open] > summary::before {
   content: "▾";
 }
 
-#playView .coach-explanation .explanation-body,
-#playView .coach-engine .engine-body {
+:is(#playView, #analysisView) .coach-explanation .explanation-body,
+:is(#playView, #analysisView) .coach-engine .engine-body {
   padding: 0 12px 12px;
 }
 
-#playView .teacher-focus {
+:is(#playView, #analysisView) .teacher-focus {
   margin-bottom: 8px;
 }
 
-#playView .teacher-focus span {
+:is(#playView, #analysisView) .teacher-focus span {
   color: #fff;
   background: var(--brand-red);
 }
 
-#playView .teacher-focus strong,
-#playView .teacher-question strong,
-#playView .teacher-section > strong,
-#playView .teacher-memory strong {
+:is(#playView, #analysisView) .teacher-focus strong,
+:is(#playView, #analysisView) .teacher-question strong,
+:is(#playView, #analysisView) .teacher-section > strong,
+:is(#playView, #analysisView) .teacher-memory strong {
   color: var(--brand-text);
 }
 
-#playView .teacher-question {
+:is(#playView, #analysisView) .teacher-question {
   margin: 8px 0;
   padding: 10px 12px;
   border-color: #eadad5;
@@ -584,84 +584,84 @@ body.play-mode .app-shell {
   background: #fbf1ee;
 }
 
-#playView .teacher-section {
+:is(#playView, #analysisView) .teacher-section {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid #ebe6df;
 }
 
-#playView .teacher-section p {
+:is(#playView, #analysisView) .teacher-section p {
   color: #706b64;
   font-size: 12px;
   line-height: 1.65;
 }
 
-#playView .teacher-memory {
+:is(#playView, #analysisView) .teacher-memory {
   margin-top: 10px;
   background: #f2eee8;
   box-shadow: none;
 }
 
-#playView .teacher-memory span {
+:is(#playView, #analysisView) .teacher-memory span {
   color: #9a6b1f;
 }
 
-#playView .teacher-confidence {
+:is(#playView, #analysisView) .teacher-confidence {
   color: #99948d;
 }
 
-#playView .ai-unavailable {
+:is(#playView, #analysisView) .ai-unavailable {
   padding: 10px 0 0;
   border: 0;
   background: transparent;
 }
 
-#playView .ai-unavailable .card-kicker {
+:is(#playView, #analysisView) .ai-unavailable .card-kicker {
   margin-bottom: 3px;
 }
 
-#playView .ai-unavailable h3 {
+:is(#playView, #analysisView) .ai-unavailable h3 {
   margin-bottom: 3px;
   font-size: 12px;
 }
 
-#playView .ai-unavailable p {
+:is(#playView, #analysisView) .ai-unavailable p {
   font-size: 11px;
   line-height: 1.45;
 }
 
-#playView .engine-fact-grid {
+:is(#playView, #analysisView) .engine-fact-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
 
-#playView .engine-fact-grid > div,
-#playView .candidate-row {
+:is(#playView, #analysisView) .engine-fact-grid > div,
+:is(#playView, #analysisView) .candidate-row {
   padding: 8px 9px;
   border-radius: 8px;
   background: #efede8;
 }
 
-#playView .engine-fact-grid span,
-#playView .engine-body > p {
+:is(#playView, #analysisView) .engine-fact-grid span,
+:is(#playView, #analysisView) .engine-body > p {
   display: block;
   color: #8a857d;
   font-size: 10px;
 }
 
-#playView .engine-fact-grid strong {
+:is(#playView, #analysisView) .engine-fact-grid strong {
   display: block;
   margin-top: 2px;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
-#playView .candidate-score {
+:is(#playView, #analysisView) .candidate-score {
   color: var(--brand-red);
 }
 
-#playView .engine-placeholder {
+:is(#playView, #analysisView) .engine-placeholder {
   flex: 0 0 auto;
   margin-top: 8px;
   padding: 8px 0 0;
@@ -670,7 +670,7 @@ body.play-mode .app-shell {
   background: transparent;
 }
 
-#playView .replay-arrow-line {
+:is(#playView, #analysisView) .replay-arrow-line {
   fill: none;
   stroke: #ed482f;
   stroke-linecap: round;
@@ -680,48 +680,48 @@ body.play-mode .app-shell {
 }
 
 @media (max-width: 1320px) {
-  body.play-mode .app-shell {
+  body:is(.play-mode, .analysis-mode) .app-shell {
     padding-left: 196px;
     padding-right: 10px;
   }
 
-  #playView.play-workspace {
+  :is(#playView, #analysisView).play-workspace {
     grid-template-columns: 200px minmax(0, 1fr) 300px;
     gap: 10px;
   }
 }
 
 @media (max-width: 1080px) {
-  #playView.play-workspace {
+  :is(#playView, #analysisView).play-workspace {
     grid-template-columns: 184px minmax(0, 1fr) 280px;
   }
 }
 
 @media (max-height: 760px) {
-  body.play-mode .app-shell {
+  body:is(.play-mode, .analysis-mode) .app-shell {
     padding-top: 8px;
     padding-bottom: 8px;
   }
 
-  #playView .board-toolbar {
+  :is(#playView, #analysisView) .board-toolbar {
     min-height: 30px;
     padding-bottom: 4px;
   }
 
-  #playView .xiangqi-board {
+  :is(#playView, #analysisView) .xiangqi-board {
     width: min(100%, calc((100vh - 96px) * 8 / 9));
   }
 }
 
 /* Mobile: board first, then quick feedback, then controls */
 @media (max-width: 980px) {
-  body.play-mode {
+  body:is(.play-mode, .analysis-mode) {
     min-width: 0 !important;
     height: auto;
     overflow: auto;
   }
 
-  body.play-mode .app-shell {
+  body:is(.play-mode, .analysis-mode) .app-shell {
     height: auto;
     min-height: 100vh;
     max-height: none;
@@ -729,7 +729,7 @@ body.play-mode .app-shell {
     padding: 56px 10px 16px;
   }
 
-  body.play-mode .topbar {
+  body:is(.play-mode, .analysis-mode) .topbar {
     inset: 0 0 auto 0;
     width: 100%;
     height: 48px;
@@ -740,26 +740,26 @@ body.play-mode .app-shell {
     gap: 8px;
   }
 
-  body.play-mode .brand {
+  body:is(.play-mode, .analysis-mode) .brand {
     gap: 6px;
     margin: 0;
     padding: 0;
     border: 0;
   }
 
-  body.play-mode .brand-mark {
+  body:is(.play-mode, .analysis-mode) .brand-mark {
     width: 28px;
     height: 28px;
     flex-basis: 28px;
     font-size: 14px;
   }
 
-  body.play-mode .brand span,
-  body.play-mode .topbar::after {
+  body:is(.play-mode, .analysis-mode) .brand span,
+  body:is(.play-mode, .analysis-mode) .topbar::after {
     display: none;
   }
 
-  body.play-mode .platform-nav {
+  body:is(.play-mode, .analysis-mode) .platform-nav {
     flex: 1 1 auto;
     flex-direction: row;
     gap: 2px;
@@ -767,57 +767,57 @@ body.play-mode .app-shell {
     overflow-x: auto;
   }
 
-  body.play-mode .platform-nav-item {
+  body:is(.play-mode, .analysis-mode) .platform-nav-item {
     width: auto;
     padding: 8px 10px;
     white-space: nowrap;
   }
 
-  body.play-mode .topbar-actions {
+  body:is(.play-mode, .analysis-mode) .topbar-actions {
     display: none;
   }
 
-  #playView.play-workspace {
+  :is(#playView, #analysisView).play-workspace {
     display: flex;
     flex-direction: column;
     height: auto;
     overflow: visible;
   }
 
-  #playView .board-column,
-  #playView .coach-panel,
-  #playView .left-panel {
+  :is(#playView, #analysisView) .board-column,
+  :is(#playView, #analysisView) .coach-panel,
+  :is(#playView, #analysisView) .left-panel {
     height: auto;
     min-height: 0;
     overflow: visible;
   }
 
-  #playView .board-column {
+  :is(#playView, #analysisView) .board-column {
     order: 1;
   }
 
-  #playView .coach-panel {
+  :is(#playView, #analysisView) .coach-panel {
     order: 2;
     max-height: none;
   }
 
-  #playView .left-panel {
+  :is(#playView, #analysisView) .left-panel {
     order: 3;
   }
 
-  #playView .board-area {
+  :is(#playView, #analysisView) .board-area {
     min-height: min(72vw, 72vh);
   }
 
-  #playView .xiangqi-board {
+  :is(#playView, #analysisView) .xiangqi-board {
     width: min(100%, calc(72vh * 8 / 9));
   }
 
-  #playView .history-section {
+  :is(#playView, #analysisView) .history-section {
     max-height: 240px;
   }
 
-  #playView .board-replay-bar {
+  :is(#playView, #analysisView) .board-replay-bar {
     flex-wrap: wrap;
   }
 }
