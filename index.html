@@ -264,106 +264,177 @@
       </main>
 
 
-      <section id="onlineView" class="platform-view platform-page online-page hidden">
-        <div class="platform-page-header online-page-header">
-          <div>
-            <span class="eyebrow">LIVE · 真人在线</span>
-            <h1>和真人下一盘</h1>
-            <p>快速匹配，或者把房间码发给朋友。每一步都由服务器重新验证。</p>
-          </div>
-          <button id="onlineBackToComputer" class="button button-ghost">返回人机对弈</button>
-        </div>
-
+      <section id="onlineView" class="platform-view online-page hidden">
         <section id="onlineLobby" class="online-lobby">
-          <div class="platform-surface online-lobby-card online-lobby-main">
-            <span class="eyebrow">开始对局</span>
-            <h2>真人对弈</h2>
-            <label class="online-field">
-              <span>你的名字</span>
-              <input id="onlineDisplayName" type="text" maxlength="24" value="棋手" autocomplete="nickname" />
-            </label>
-            <label class="online-field">
-              <span>时间制</span>
-              <select id="onlineTimeControl">
-                <option value="600+0">10 + 0 · 快棋</option>
-                <option value="600+5">10 + 5 · 加秒</option>
-                <option value="300+3">5 + 3 · 快速</option>
-              </select>
-            </label>
-            <div class="online-primary-actions">
-              <button id="onlineQuickMatch" class="button button-primary">快速匹配</button>
-              <button id="onlineCancelMatch" class="button button-ghost">取消匹配</button>
-            </div>
-            <p id="onlineStatus" class="online-status">选择一种方式开始。</p>
+          <div class="online-lobby-hero">
+            <span class="eyebrow">LIVE</span>
+            <h1>和真人下一盘</h1>
+            <p>快速匹配，或把房间码发给朋友。开局后棋盘就是整个桌子。</p>
           </div>
 
-          <div class="online-lobby-side">
-            <article class="platform-surface online-lobby-card">
-              <span class="eyebrow">私人房间</span>
-              <h3>创建房间</h3>
-              <p>创建后会得到一个房间码，对方输入即可加入。</p>
-              <button id="onlineCreateRoom" class="button button-ghost action-wide">创建房间</button>
-            </article>
-            <article class="platform-surface online-lobby-card">
-              <span class="eyebrow">加入房间</span>
-              <h3>输入房间码</h3>
-              <div class="online-room-join">
-                <input id="onlineRoomCode" type="text" maxlength="10" placeholder="例如 A1B2C3D4E5" />
-                <button id="onlineJoinRoom" class="button button-secondary">加入</button>
+          <div class="online-lobby-grid">
+            <article class="online-lobby-card online-lobby-main">
+              <span class="eyebrow">开始对局</span>
+              <h2>快速匹配</h2>
+              <label class="online-field">
+                <span>你的名字</span>
+                <input id="onlineDisplayName" type="text" maxlength="24" value="棋手" autocomplete="nickname" />
+              </label>
+              <label class="online-field">
+                <span>时间制</span>
+                <select id="onlineTimeControl">
+                  <option value="600+0">10 + 0 · 快棋</option>
+                  <option value="600+5">10 + 5 · 加秒</option>
+                  <option value="300+3">5 + 3 · 快速</option>
+                </select>
+              </label>
+              <div class="online-primary-actions">
+                <button id="onlineQuickMatch" class="button button-primary">快速匹配</button>
+                <button id="onlineCancelMatch" class="button button-ghost hidden">取消匹配</button>
               </div>
+              <p id="onlineStatus" class="online-status">选择一种方式开始。</p>
             </article>
+
+            <div class="online-lobby-side">
+              <article class="online-lobby-card">
+                <span class="eyebrow">私人房间</span>
+                <h3>创建房间</h3>
+                <p>生成房间码，发给朋友即可开局。</p>
+                <button id="onlineCreateRoom" class="button button-ghost action-wide">创建房间</button>
+              </article>
+              <article class="online-lobby-card">
+                <span class="eyebrow">加入房间</span>
+                <h3>输入房间码</h3>
+                <div class="online-room-join">
+                  <input id="onlineRoomCode" type="text" maxlength="10" placeholder="例如 A1B2C3D4" />
+                  <button id="onlineJoinRoom" class="button button-secondary">加入</button>
+                </div>
+              </article>
+            </div>
           </div>
+
+          <button id="onlineBackToComputer" class="button button-ghost online-lobby-back">返回人机对弈</button>
         </section>
 
-        <section id="onlineGame" class="online-game hidden">
-          <div class="online-game-layout">
-            <aside class="platform-surface online-player-column">
-              <div class="online-player-card black">
-                <div class="online-player-token">将</div>
-                <div><span>黑方</span><strong id="onlineBlackName">等待对手</strong></div>
-                <b id="onlineBlackClock" class="online-clock">10:00</b>
-              </div>
-              <div class="online-room-meta">
-                <span>房间</span>
-                <strong id="onlineRoomCodeDisplay">—</strong>
-                <button id="onlineCopyRoomCode" class="button button-ghost">复制房间码</button>
-              </div>
-              <div class="online-player-card red">
-                <div class="online-player-token">帅</div>
-                <div><span>红方</span><strong id="onlineRedName">红方</strong></div>
-                <b id="onlineRedClock" class="online-clock">10:00</b>
-              </div>
-            </aside>
-
-            <section class="platform-surface online-board-column">
-              <div id="onlineGameState" class="online-game-state">等待对局开始</div>
-              <div class="online-xiangqi-board" aria-label="真人中国象棋棋盘">
-                <div class="online-board-river"><span>楚 河</span><span>汉 界</span></div>
-                <div id="onlineBoardPoints"></div>
-              </div>
-              <div class="online-game-actions">
-                <button id="onlineOfferDraw" class="button button-ghost">求和</button>
-                <button id="onlineResign" class="button button-ghost">认输</button>
-                <button id="onlineReturnLobby" class="button button-secondary">返回大厅</button>
-              </div>
-              <div id="onlineDrawOffer" class="online-draw-offer hidden">
-                <strong>对手请求和棋</strong>
-                <div>
-                  <button id="onlineAcceptDraw" class="button button-primary">同意</button>
-                  <button id="onlineDeclineDraw" class="button button-ghost">拒绝</button>
+        <section id="onlineGame" class="online-table hidden">
+          <div class="online-table-workspace">
+            <section class="online-table-stage">
+              <div id="onlineOppSeat" class="online-seat">
+                <div class="online-seat-who">
+                  <div id="onlineOppToken" class="online-seat-token black">将</div>
+                  <div>
+                    <span id="onlineOppColor">黑方</span>
+                    <strong id="onlineOppName">等待对手</strong>
+                  </div>
                 </div>
+                <b id="onlineOppClock" class="online-clock">10:00</b>
+              </div>
+
+              <div class="online-board-area">
+                <div id="onlineBoard" class="xiangqi-board" aria-label="真人中国象棋棋盘">
+                  <svg class="board-lines" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true">
+                    <g class="grid-lines">
+                      <line x1="0" y1="0" x2="800" y2="0" />
+                      <line x1="0" y1="100" x2="800" y2="100" />
+                      <line x1="0" y1="200" x2="800" y2="200" />
+                      <line x1="0" y1="300" x2="800" y2="300" />
+                      <line x1="0" y1="400" x2="800" y2="400" />
+                      <line x1="0" y1="500" x2="800" y2="500" />
+                      <line x1="0" y1="600" x2="800" y2="600" />
+                      <line x1="0" y1="700" x2="800" y2="700" />
+                      <line x1="0" y1="800" x2="800" y2="800" />
+                      <line x1="0" y1="900" x2="800" y2="900" />
+                      <line x1="0" y1="0" x2="0" y2="900" />
+                      <line x1="100" y1="0" x2="100" y2="400" />
+                      <line x1="100" y1="500" x2="100" y2="900" />
+                      <line x1="200" y1="0" x2="200" y2="400" />
+                      <line x1="200" y1="500" x2="200" y2="900" />
+                      <line x1="300" y1="0" x2="300" y2="400" />
+                      <line x1="300" y1="500" x2="300" y2="900" />
+                      <line x1="400" y1="0" x2="400" y2="400" />
+                      <line x1="400" y1="500" x2="400" y2="900" />
+                      <line x1="500" y1="0" x2="500" y2="400" />
+                      <line x1="500" y1="500" x2="500" y2="900" />
+                      <line x1="600" y1="0" x2="600" y2="400" />
+                      <line x1="600" y1="500" x2="600" y2="900" />
+                      <line x1="700" y1="0" x2="700" y2="400" />
+                      <line x1="700" y1="500" x2="700" y2="900" />
+                      <line x1="800" y1="0" x2="800" y2="900" />
+                      <line x1="300" y1="0" x2="500" y2="200" />
+                      <line x1="500" y1="0" x2="300" y2="200" />
+                      <line x1="300" y1="700" x2="500" y2="900" />
+                      <line x1="500" y1="700" x2="300" y2="900" />
+                    </g>
+                    <text x="175" y="470" class="river-label">楚 河</text>
+                    <text x="625" y="470" class="river-label">汉 界</text>
+                  </svg>
+                  <div id="onlineBoardPoints" class="board-points"></div>
+                  <div id="onlineWaitingOverlay" class="online-waiting-overlay hidden">
+                    <span class="eyebrow">私人房间</span>
+                    <h2>等待对手加入</h2>
+                    <p>把房间码发给朋友，对方输入即可开局。</p>
+                    <strong id="onlineWaitingCode">—</strong>
+                    <button id="onlineWaitingCopy" class="button button-primary" type="button" data-copy-room data-copy-label="复制房间码">复制房间码</button>
+                    <small id="onlineWaitingMeta">10 + 0 · 你执红</small>
+                  </div>
+                  <div id="onlineResultOverlay" class="game-result-overlay hidden">
+                    <div class="game-result-card">
+                      <span class="game-result-kicker">对局结束</span>
+                      <div id="onlineResultMark" class="game-result-mark">负</div>
+                      <h2 id="onlineResultTitle">本局落败</h2>
+                      <p id="onlineResultReason" class="game-result-reason">被将死</p>
+                      <div class="game-result-actions">
+                        <button id="onlineResultLobby" class="button button-primary" type="button">返回大厅</button>
+                        <button id="onlineResultDismiss" class="button button-secondary" type="button">查看棋盘</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div id="onlineDrawOffer" class="online-draw-offer hidden">
+                    <strong>对手请求和棋</strong>
+                    <div>
+                      <button id="onlineAcceptDraw" class="button button-primary">同意</button>
+                      <button id="onlineDeclineDraw" class="button button-ghost">拒绝</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="onlineYouSeat" class="online-seat you">
+                <div class="online-seat-who">
+                  <div id="onlineYouToken" class="online-seat-token red">帅</div>
+                  <div>
+                    <span id="onlineYouColor">红方</span>
+                    <strong id="onlineYouName">你</strong>
+                  </div>
+                </div>
+                <b id="onlineYouClock" class="online-clock">10:00</b>
               </div>
             </section>
 
-            <aside class="platform-surface online-side-panel">
-              <span class="eyebrow">对局记录</span>
-              <h2>着法</h2>
-              <div id="onlineMoveList" class="online-move-list">
-                <div class="online-empty">还没有走子</div>
+            <aside class="online-table-rail">
+              <div class="online-room-card">
+                <span>房间</span>
+                <strong id="onlineRoomCodeDisplay">—</strong>
+                <button id="onlineCopyRoomCode" class="button button-ghost" type="button" data-copy-room data-copy-label="复制">复制</button>
               </div>
-              <div class="online-server-note">
-                <strong>服务器裁判</strong>
-                <p>走子、轮次和时钟由服务器决定。刷新页面会自动尝试回到本局。</p>
+              <div class="online-meta-grid">
+                <div><span>时间</span><strong id="onlineTimeLabel">10 + 0</strong></div>
+                <div><span>你执</span><strong id="onlineYourColor">红</strong></div>
+                <div class="online-meta-state"><span>状态</span><strong id="onlineGameState">等待对局开始</strong></div>
+              </div>
+              <div class="online-move-block">
+                <div class="online-move-head">
+                  <span class="eyebrow">本局</span>
+                  <h2>棋谱</h2>
+                </div>
+                <div id="onlineMoveList" class="online-move-list">
+                  <div class="online-empty">还没有走子</div>
+                </div>
+              </div>
+              <div class="online-table-actions">
+                <button id="onlineOfferDraw" class="button button-ghost">求和</button>
+                <button id="onlineResign" class="button button-ghost">认输</button>
+                <button id="onlineReturnLobby" class="button button-secondary action-wide">离开房间</button>
               </div>
             </aside>
           </div>

@@ -1718,6 +1718,13 @@ function switchPlatformView(viewName) {
   document.querySelector(".play-only-action")?.classList.toggle("hidden", target !== "play");
   quickPlayButtonElement?.classList.toggle("hidden", target === "play" || target === "online");
   document.body.classList.toggle("play-mode", target === "play");
+  document.body.classList.toggle("online-mode", target === "online");
+  if (target === "online") {
+    const table = document.querySelector("#onlineGame");
+    document.body.classList.toggle("online-table-active", Boolean(table && !table.classList.contains("hidden")));
+  } else {
+    document.body.classList.remove("online-table-active");
+  }
   if (target !== "play") closeBoardReplay();
 }
 

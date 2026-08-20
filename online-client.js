@@ -4,6 +4,7 @@ const isLocalDev = ["localhost", "127.0.0.1"].includes(window.location.hostname)
 const API = window.__QILI_ONLINE_API__ || (isLocalDev ? "http://127.0.0.1:8787" : window.location.origin);
 const SESSION_KEY = "qili-online-session";
 
+const RED_NUMERALS = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 const lobby = document.querySelector("#onlineLobby");
 const game = document.querySelector("#onlineGame");
 const statusEl = document.querySelector("#onlineStatus");
@@ -13,12 +14,28 @@ const roomInput = document.querySelector("#onlineRoomCode");
 const roomCodeEl = document.querySelector("#onlineRoomCodeDisplay");
 const boardPoints = document.querySelector("#onlineBoardPoints");
 const moveList = document.querySelector("#onlineMoveList");
-const redName = document.querySelector("#onlineRedName");
-const blackName = document.querySelector("#onlineBlackName");
-const redClock = document.querySelector("#onlineRedClock");
-const blackClock = document.querySelector("#onlineBlackClock");
+const oppName = document.querySelector("#onlineOppName");
+const youName = document.querySelector("#onlineYouName");
+const oppClock = document.querySelector("#onlineOppClock");
+const youClock = document.querySelector("#onlineYouClock");
+const oppToken = document.querySelector("#onlineOppToken");
+const youToken = document.querySelector("#onlineYouToken");
+const oppColorEl = document.querySelector("#onlineOppColor");
+const youColorEl = document.querySelector("#onlineYouColor");
+const oppSeat = document.querySelector("#onlineOppSeat");
+const youSeat = document.querySelector("#onlineYouSeat");
 const gameStateEl = document.querySelector("#onlineGameState");
 const drawOfferEl = document.querySelector("#onlineDrawOffer");
+const waitingOverlay = document.querySelector("#onlineWaitingOverlay");
+const waitingCode = document.querySelector("#onlineWaitingCode");
+const waitingMeta = document.querySelector("#onlineWaitingMeta");
+const timeLabelEl = document.querySelector("#onlineTimeLabel");
+const yourColorEl = document.querySelector("#onlineYourColor");
+const resultOverlay = document.querySelector("#onlineResultOverlay");
+const resultMark = document.querySelector("#onlineResultMark");
+const resultTitle = document.querySelector("#onlineResultTitle");
+const resultReason = document.querySelector("#onlineResultReason");
+const cancelMatchButton = document.querySelector("#onlineCancelMatch");
 
 let session = null;
 let room = null;
@@ -76,11 +93,67 @@ function closeStream() {
 function showLobby() {
   lobby?.classList.remove("hidden");
   game?.classList.add("hidden");
+  document.body.classList.remove("online-table-active");
 }
 
 function showGame() {
   lobby?.classList.add("hidden");
   game?.classList.remove("hidden");
+  const onlineView = document.querySelector("#onlineView");
+  if (onlineView && !onlineView.classList.contains("hidden")) {
+    document.body.classList.add("online-table-active");
+  }
+}
+
+function setMatching(active) {
+  lobby?.classList.toggle("is-matching", Boolean(active));
+  cancelMatchButton?.classList.toggle("hidden", !active);
+}
+
+function timeLabel(tc = room?.timeControl) {
+  const base = Math.round(Number(tc?.baseSeconds || 600) / 60);
+  const inc = Number(tc?.incrementSeconds || 0);
+  return `${base} + ${inc}`;
+}
+
+function fileName(col, color) {
+  return color === "red" ? RED_NUMERALS[8 - col] : String(col + 1);
+}
+
+function distanceName(distance, color) {
+  return color === "red" ? RED_NUMERALS[distance - 1] : String(distance);
+}
+
+function formatOnlineMove(item) {
+  const move = item?.move;
+  const color = item?.color;
+  const label = item?.piece || "棋";
+  if (!move || !color) return label;
+  const fromFile = fileName(move.fromCol, color);
+  const toFile = fileName(move.toCol, color);
+  const vertical = move.fromCol === move.toCol;
+  const forward = color === "red" ? move.toRow < move.fromRow : move.toRow > move.fromRow;
+  let action;
+  let destination;
+  if (!vertical && move.fromRow === move.toRow) {
+    action = "平";
+    destination = toFile;
+  } else if (!vertical) {
+    action = forward ? "进" : "退";
+    destination = toFile;
+  } else {
+    action = forward ? "进" : "退";
+    destination = distanceName(Math.abs(move.toRow - move.fromRow), color);
+  }
+  return `${label}${fromFile}${action}${destination}`;
+}
+
+function colorLabel(color) {
+  return color === "red" ? "红方" : "黑方";
+}
+
+function tokenFor(color) {
+  return color === "red" ? "帅" : "将";
 }
 
 function resultText(result) {
@@ -98,10 +171,17 @@ function renderMoveHistory() {
     moveList.innerHTML = '<div class="online-empty">还没有走子</div>';
     return;
   }
-  moveList.innerHTML = moves.slice(-24).map((item) => {
-    const m = item.move;
-    return `<div class="online-move-row"><span>${item.ply}</span><strong>${item.piece || "棋"}</strong><em>${m.fromCol},${m.fromRow} → ${m.toCol},${m.toRow}${item.captured ? ` · 吃${item.captured}` : ""}</em></div>`;
-  }).join("");
+  const rows = [];
+  for (let index = 0; index < moves.length; index += 2) {
+    const redMove = moves[index];
+    const blackMove = moves[index + 1];
+    rows.push(
+      `<div class="online-move-row"><span>${Math.floor(index / 2) + 1}.</span>` +
+      `<span class="red-move">${redMove ? formatOnlineMove(redMove) : ""}</span>` +
+      `<span class="black-move">${blackMove ? formatOnlineMove(blackMove) : ""}</span></div>`
+    );
+  }
+  moveList.innerHTML = rows.join("");
   moveList.scrollTop = moveList.scrollHeight;
 }
 
@@ -109,24 +189,29 @@ function renderBoard() {
   if (!boardPoints || !room?.board) return;
   boardPoints.innerHTML = "";
   const flipped = session?.color === "black";
+  const lastMove = room.moveHistory?.at(-1)?.move;
+  const myTurn = room.status === "active" && room.currentTurn === session?.color;
   for (let row = 0; row < 10; row += 1) {
     for (let col = 0; col < 9; col += 1) {
       const point = document.createElement("button");
       const visualRow = flipped ? 9 - row : row;
       const visualCol = flipped ? 8 - col : col;
-      point.className = "online-board-point";
+      point.className = "board-point";
       point.style.left = `${(visualCol / 8) * 100}%`;
       point.style.top = `${(visualRow / 9) * 100}%`;
       point.setAttribute("aria-label", `第${row + 1}行第${col + 1}列`);
       if (selected?.row === row && selected?.col === col) point.classList.add("selected");
       const legal = legalTargets.some((move) => move.toRow === row && move.toCol === col);
-      if (legal) point.classList.add(room.board[row][col] ? "capture" : "legal");
       const entry = room.board[row][col];
+      if (legal) point.classList.add(entry ? "capture" : "legal");
+      if (lastMove?.fromRow === row && lastMove?.fromCol === col) point.classList.add("last-from");
+      if (lastMove?.toRow === row && lastMove?.toCol === col) point.classList.add("last-to");
       if (entry) {
         const chip = document.createElement("span");
-        chip.className = `online-piece ${entry.color}`;
+        chip.className = `piece ${entry.color}-piece`;
         chip.textContent = entry.label;
         point.appendChild(chip);
+        if (myTurn && entry.color === session?.color) point.classList.add("selectable");
       }
       point.addEventListener("click", () => handleBoardClick(row, col));
       boardPoints.appendChild(point);
@@ -134,24 +219,76 @@ function renderBoard() {
   }
 }
 
+function renderSeat(kind, color, player, clockMs, toMove) {
+  const isYou = kind === "you";
+  const nameEl = isYou ? youName : oppName;
+  const clockEl = isYou ? youClock : oppClock;
+  const tokenEl = isYou ? youToken : oppToken;
+  const colorEl = isYou ? youColorEl : oppColorEl;
+  const seatEl = isYou ? youSeat : oppSeat;
+  if (nameEl) nameEl.textContent = player?.name || (isYou ? "你" : "等待对手");
+  if (colorEl) colorEl.textContent = colorLabel(color);
+  if (tokenEl) {
+    tokenEl.textContent = tokenFor(color);
+    tokenEl.className = `online-seat-token ${color}`;
+  }
+  if (clockEl) {
+    clockEl.textContent = formatClock(clockMs);
+    clockEl.classList.toggle("active", toMove);
+    clockEl.classList.toggle("urgent", Number(clockMs) > 0 && Number(clockMs) <= 20000);
+  }
+  seatEl?.classList.toggle("to-move", toMove);
+}
+
+function renderWaiting() {
+  const waiting = room?.status === "waiting";
+  waitingOverlay?.classList.toggle("hidden", !waiting);
+  if (!waiting) return;
+  if (waitingCode) waitingCode.textContent = room.id || "—";
+  if (waitingMeta) {
+    const color = session?.color === "black" ? "黑" : "红";
+    waitingMeta.textContent = `${timeLabel()} · 你执${color}`;
+  }
+}
+
+function renderResult() {
+  if (!resultOverlay) return;
+  if (room?.status !== "finished" || !room.result) {
+    resultOverlay.classList.add("hidden");
+    return;
+  }
+  const winner = room.result.winner;
+  const isDraw = !winner;
+  const didWin = winner && winner === session?.color;
+  resultOverlay.classList.remove("hidden", "win", "loss", "draw");
+  resultOverlay.classList.add(isDraw ? "draw" : didWin ? "win" : "loss");
+  if (resultMark) resultMark.textContent = isDraw ? "和" : didWin ? "胜" : "负";
+  if (resultTitle) resultTitle.textContent = isDraw ? "本局和棋" : didWin ? "本局获胜" : "本局落败";
+  if (resultReason) resultReason.textContent = resultText(room.result);
+}
+
 function renderRoom() {
   if (!room) return;
   showGame();
-  roomCodeEl.textContent = room.id;
-  redName.textContent = room.players.red?.name || "等待红方";
-  blackName.textContent = room.players.black?.name || "等待对手";
-  redClock.textContent = formatClock(room.clocks?.redMs);
-  blackClock.textContent = formatClock(room.clocks?.blackMs);
-  redClock.classList.toggle("active", room.status === "active" && room.currentTurn === "red");
-  blackClock.classList.toggle("active", room.status === "active" && room.currentTurn === "black");
-  const myTurn = room.status === "active" && room.currentTurn === session?.color;
-  gameStateEl.textContent = room.status === "waiting"
-    ? "房间已创建，等待另一位棋手加入"
-    : room.status === "finished"
-      ? resultText(room.result)
-      : myTurn ? "轮到你走" : "等待对手走棋";
-  drawOfferEl?.classList.toggle("hidden", !(room.drawOfferBy && room.drawOfferBy !== session?.color && room.status === "active"));
+  const myColor = session?.color || "red";
+  const oppColor = myColor === "red" ? "black" : "red";
+  const myTurn = room.status === "active" && room.currentTurn === myColor;
+  if (roomCodeEl) roomCodeEl.textContent = room.id;
+  if (timeLabelEl) timeLabelEl.textContent = timeLabel(room.timeControl);
+  if (yourColorEl) yourColorEl.textContent = myColor === "red" ? "红" : "黑";
+  renderSeat("opp", oppColor, room.players?.[oppColor], room.clocks?.[`${oppColor}Ms`], room.status === "active" && room.currentTurn === oppColor);
+  renderSeat("you", myColor, room.players?.[myColor], room.clocks?.[`${myColor}Ms`], myTurn);
+  if (gameStateEl) {
+    gameStateEl.textContent = room.status === "waiting"
+      ? "等待对手加入"
+      : room.status === "finished"
+        ? resultText(room.result)
+        : myTurn ? "轮到你走" : "等待对手";
+  }
+  drawOfferEl?.classList.toggle("hidden", !(room.drawOfferBy && room.drawOfferBy !== myColor && room.status === "active"));
   if (room.status !== "active") { selected = null; legalTargets = []; }
+  renderWaiting();
+  renderResult();
   renderBoard();
   renderMoveHistory();
 }
@@ -237,11 +374,13 @@ async function pollMatch() {
     if (ticket.status === "matched") {
       stopMatchPolling();
       ticketId = null;
+      setMatching(false);
       await adoptSession(ticket.roomId, ticket.playerToken, ticket.color);
       setStatus("");
     }
   } catch (error) {
     stopMatchPolling();
+    setMatching(false);
     setStatus(error.message, "error");
   }
 }
@@ -251,6 +390,7 @@ async function quickMatch() {
   await window.QiliIdentity?.ensureIdentity?.().catch(() => null);
   await window.QiliIdentity?.syncDisplayName?.(nameInput?.value || "棋手").catch(() => null);
   stopMatchPolling();
+  setMatching(true);
   setStatus("正在寻找同时间制棋手…");
   try {
     const ticket = await request("/api/online/matchmaking", {
@@ -260,12 +400,14 @@ async function quickMatch() {
     ticketId = ticket.ticketId;
     if (ticket.status === "matched") {
       ticketId = null;
+      setMatching(false);
       await adoptSession(ticket.roomId, ticket.playerToken, ticket.color);
       setStatus("");
       return;
     }
+    setMatching(true);
     matchPoll = setInterval(pollMatch, 1200);
-  } catch (error) { setStatus(error.message, "error"); }
+  } catch (error) { setMatching(false); setStatus(error.message, "error"); }
 }
 
 async function cancelMatch() {
@@ -274,7 +416,30 @@ async function cancelMatch() {
     await request("/api/online/matchmaking/cancel", { method: "POST", body: JSON.stringify({ ticketId }) }).catch(() => {});
   }
   ticketId = null;
+  setMatching(false);
   setStatus("已取消匹配");
+}
+
+function copyRoomCode() {
+  const id = room?.id;
+  if (!id || !navigator.clipboard) return;
+  navigator.clipboard.writeText(id).then(() => {
+    document.querySelectorAll("[data-copy-room]").forEach((button) => {
+      const original = button.dataset.copyLabel || button.textContent;
+      button.textContent = "已复制";
+      window.setTimeout(() => { button.textContent = original; }, 1400);
+    });
+  }).catch(() => {});
+}
+
+function leaveRoom() {
+  closeStream();
+  saveSession(null);
+  room = null;
+  selected = null;
+  legalTargets = [];
+  resultOverlay?.classList.add("hidden");
+  showLobby();
 }
 
 async function sendAction(type, extra = {}) {
@@ -353,15 +518,10 @@ document.querySelector("#onlineResign")?.addEventListener("click", () => sendAct
 document.querySelector("#onlineOfferDraw")?.addEventListener("click", () => sendAction("offerDraw"));
 document.querySelector("#onlineAcceptDraw")?.addEventListener("click", () => sendAction("acceptDraw"));
 document.querySelector("#onlineDeclineDraw")?.addEventListener("click", () => sendAction("declineDraw"));
-document.querySelector("#onlineCopyRoomCode")?.addEventListener("click", () => navigator.clipboard?.writeText(room?.id || ""));
-document.querySelector("#onlineReturnLobby")?.addEventListener("click", () => {
-  closeStream();
-  saveSession(null);
-  room = null;
-  selected = null;
-  legalTargets = [];
-  showLobby();
-});
+document.querySelectorAll("[data-copy-room]").forEach((button) => button.addEventListener("click", copyRoomCode));
+document.querySelector("#onlineReturnLobby")?.addEventListener("click", leaveRoom);
+document.querySelector("#onlineResultLobby")?.addEventListener("click", leaveRoom);
+document.querySelector("#onlineResultDismiss")?.addEventListener("click", () => resultOverlay?.classList.add("hidden"));
 
 showLobby();
 checkOnlineApi();
