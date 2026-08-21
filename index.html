@@ -49,9 +49,9 @@
       <main id="landingTop">
         <section class="landing-hero" aria-labelledby="landingTitle">
           <div class="landing-hero-copy">
-            <div class="landing-kicker"><span>●</span> 在线中国象棋 · AI 复盘与训练</div>
+            <div class="landing-kicker"><span>●</span> 中国象棋的新玩法 · 1+0 / 3+2 / 15+10</div>
             <h1 id="landingTitle">下完这一盘，<br><em>真的变强一点。</em></h1>
-            <p class="landing-lede">和真人或电脑下棋。AI 帮你看懂关键一手，再把问题变成下一课。</p>
+            <p class="landing-lede">一分钟靠棋感，3+2 每步赚回思考时间。和真人或电脑下棋，再让 AI 把关键一手变成下一课。</p>
             <div class="landing-actions">
               <button class="landing-cta landing-cta-primary" type="button" data-landing-action="signin">
                 <span>免费开始</span><i aria-hidden="true">→</i>
@@ -102,33 +102,24 @@
 
         <section class="landing-time-modes" aria-labelledby="landingTimeTitle">
           <div class="landing-time-head">
-            <div><span>PLAY YOUR PACE</span><h2 id="landingTimeTitle">中国象棋，<br>也可以只花一分钟。</h2></div>
-            <p>从一触即发的 1+0，到能认真算变化的 15+10。不同时间制分别进入超快棋、快棋和中局 Qili 分池。</p>
+            <div><span>A NEW WAY TO PLAY XIANGQI</span><h2 id="landingTimeTitle">不只是下快一点。<br>是中国象棋的新玩法。</h2></div>
+            <p>时间不再只是限制，它是棋盘上的另一种资源。抢攻、加秒、读秒翻盘——同一副棋，完全不同的感觉。</p>
           </div>
-          <div class="landing-time-grid">
-            <article class="landing-time-card landing-time-bullet">
-              <div class="landing-time-card-head"><span><i>⚡</i> 超快棋</span><small>BULLET</small></div>
-              <strong>1:00</strong>
-              <h3>一秒都不能浪费</h3>
-              <p>整盘只有一分钟。凭直觉、棋感和手速，在压力里找到唯一的路。</p>
-              <div class="landing-time-options"><button type="button" data-landing-action="mode" data-time-control="60+0"><b>1+0</b><small>1 分钟</small></button><button type="button" data-landing-action="mode" data-time-control="120+1"><b>2+1</b><small>每步 +1 秒</small></button></div>
+          <div class="landing-time-console">
+            <article class="landing-time-spotlight">
+              <div class="landing-live-label"><i></i> 本周热门</div>
+              <div class="landing-clock"><span>03</span><em>:</em><span>00</span><b>+2</b></div>
+              <h3>3+2 · 加秒快棋</h3>
+              <p>三分钟起步，每走一步拿回两秒。既要快，也给真正的好棋留一点时间。</p>
+              <button type="button" data-landing-action="mode" data-time-control="180+2">玩一盘 3+2 <span>→</span></button>
             </article>
-            <article class="landing-time-card landing-time-blitz">
-              <div class="landing-time-card-head"><span><i>◆</i> 快棋</span><small>BLITZ</small></div>
-              <strong>3+2</strong>
-              <h3>快，但不能乱</h3>
-              <p>三分钟起步，每走一步加两秒。敢进攻，也要留得住思考时间。</p>
-              <div class="landing-time-options"><button class="featured" type="button" data-landing-action="mode" data-time-control="180+2"><b>3+2</b><small>每步 +2 秒</small></button><button type="button" data-landing-action="mode" data-time-control="300+0"><b>5+0</b><small>5 分钟</small></button><button type="button" data-landing-action="mode" data-time-control="300+3"><b>5+3</b><small>每步 +3 秒</small></button></div>
-            </article>
-            <article class="landing-time-card landing-time-rapid">
-              <div class="landing-time-card-head"><span><i>◷</i> 中局 / 慢棋</span><small>RAPID</small></div>
-              <strong>10:00</strong>
-              <h3>给好棋多一点时间</h3>
-              <p>完整布局、认真计算，再让复盘把整盘棋讲清楚。</p>
-              <div class="landing-time-options"><button type="button" data-landing-action="mode" data-time-control="600+0"><b>10+0</b><small>10 分钟</small></button><button type="button" data-landing-action="mode" data-time-control="600+5"><b>10+5</b><small>每步 +5 秒</small></button><button type="button" data-landing-action="mode" data-time-control="900+10"><b>15+10</b><small>认真下一盘</small></button></div>
-            </article>
+            <div class="landing-mode-list">
+              <article><div class="landing-mode-icon red">⚡</div><div><span>凭棋感冲线</span><h3>超快棋</h3><p>一分钟也能有完整胜负。</p></div><div class="landing-mode-chips"><button type="button" data-landing-action="mode" data-time-control="60+0">1+0</button><button type="button" data-landing-action="mode" data-time-control="120+1">2+1</button></div></article>
+              <article><div class="landing-mode-icon purple">+2</div><div><span>每步赚回时间</span><h3>加秒快棋</h3><p>速度和计算都不能少。</p></div><div class="landing-mode-chips"><button class="active" type="button" data-landing-action="mode" data-time-control="180+2">3+2</button><button type="button" data-landing-action="mode" data-time-control="300+3">5+3</button></div></article>
+              <article><div class="landing-mode-icon dark">◷</div><div><span>认真算一盘</span><h3>中局 / 慢棋</h3><p>布局、计算、复盘都更完整。</p></div><div class="landing-mode-chips"><button type="button" data-landing-action="mode" data-time-control="300+0">5+0</button><button type="button" data-landing-action="mode" data-time-control="600+0">10+0</button><button type="button" data-landing-action="mode" data-time-control="600+5">10+5</button><button type="button" data-landing-action="mode" data-time-control="900+10">15+10</button></div></article>
+            </div>
           </div>
-          <p class="landing-time-note"><span></span> 点击任意时间制，进入真人匹配大厅并自动选好时钟</p>
+          <p class="landing-time-note"><span></span> 点一种时间制，时钟会自动带进真人匹配大厅</p>
         </section>
 
         <section id="landingFeatures" class="landing-features" aria-labelledby="landingFeaturesTitle">
@@ -144,15 +135,15 @@
         </section>
 
         <section class="landing-community" aria-labelledby="landingCommunityTitle">
-          <div class="landing-community-head"><div><span>PLAYER VOICES</span><h2 id="landingCommunityTitle">如果棋手会说真话。</h2></div><p>体验反馈示例</p></div>
-          <div class="landing-comment-stack">
-            <article class="landing-comment-card"><div class="landing-comment-user"><span class="avatar-red">北</span><div><b>北望长安</b><small>快棋玩家 · 示例昵称</small></div><i>★★★★★</i></div><blockquote>“终于有人把复盘讲成人话了。以前我只看哪里掉了子，现在知道自己当时漏想了什么。”</blockquote><div class="landing-comment-tags"><span>AI 复盘</span><span>3+2 快棋</span></div></article>
-            <article class="landing-comment-card featured"><div class="landing-comment-user"><span class="avatar-yellow">炮</span><div><b>老张的炮</b><small>超快棋玩家 · 示例昵称</small></div><i>★★★★★</i></div><blockquote>“1 分钟局真的上头。午休不用凑出半小时，也能完整下一盘有输赢的棋。”</blockquote><div class="landing-comment-tags"><span>1+0 超快棋</span><span>真人匹配</span></div></article>
-            <article class="landing-comment-card"><div class="landing-comment-user"><span class="avatar-green">河</span><div><b>河界以南</b><small>学习型玩家 · 示例昵称</small></div><i>★★★★★</i></div><blockquote>“3+2 刚刚好：够我认真算，又不会拖太久。下完直接知道下一课练什么。”</blockquote><div class="landing-comment-tags"><span>个性训练</span><span>能力画像</span></div></article>
+          <div class="landing-community-head"><div><span>棋友气氛组 · 示例弹幕</span><h2 id="landingCommunityTitle">下棋的人，话都很多。</h2></div><p>正在聊 · 8</p></div>
+          <div class="landing-chat-feed">
+            <article class="landing-chat-message red"><span>炮</span><div><b>老张的炮 <small>刚刚</small></b><p>1+0 根本没空后悔。下一盘！⚡</p><em>12 个棋友觉得真实</em></div></article>
+            <article class="landing-chat-message purple"><span>河</span><div><b>河界以南 <small>2 分钟前</small></b><p>3+2 太懂我了：想算两步，但又不想下半小时。</p><em>😂 8　🤝 5</em></div></article>
+            <article class="landing-chat-message yellow"><span>马</span><div><b>马走日常 <small>3 分钟前</small></b><p>输了。不过复盘说我第 11 回合很帅 😎</p><em>妙手虽迟但到</em></div></article>
+            <article class="landing-chat-message green"><span>兵</span><div><b>过河小兵 <small>5 分钟前</small></b><p>别催，正在补「底线安全」这堂课。</p><em>已连续学习 3 天</em></div></article>
+            <article class="landing-chat-message dark"><span>帅</span><div><b>今天不悔棋 <small>6 分钟前</small></b><p>炮二平五，然后听天由命。</p><em>♟ 发起 3+2 挑战</em></div></article>
           </div>
-          <p class="landing-community-disclosure">以上为产品体验场景的示例文案，不代表真实用户背书；积累真实反馈后可原位替换。</p>
-          <div class="landing-achievements" aria-hidden="true"><i>妙</i><i>稳</i><i>升</i>
-          </div>
+          <p class="landing-community-disclosure">以上是为了展示社区气氛的示例对话，不是真实用户评价。</p>
         </section>
 
         <section class="landing-final-cta">
