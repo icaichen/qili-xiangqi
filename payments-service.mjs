@@ -1,8 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-// Billing env (Railway): PAYMENTS_PROVIDER=lemonsqueezy
-// LEMONSQUEEZY_API_KEY, LEMONSQUEEZY_STORE_ID, LEMONSQUEEZY_WEBHOOK_SECRET
-// LEMONSQUEEZY_VARIANT_MONTHLY, LEMONSQUEEZY_VARIANT_YEARLY, APP_URL
-// Webhook URL: https://qilichess.com/api/billing/webhook (signing secret → LEMONSQUEEZY_WEBHOOK_SECRET)
+// Billing env (Railway): PAYMENTS_PROVIDER=paddle
+// PADDLE_API_KEY, PADDLE_CLIENT_TOKEN, PADDLE_WEBHOOK_SECRET
+// PADDLE_PRICE_MONTHLY, PADDLE_PRICE_YEARLY, PADDLE_ENV=sandbox|production, APP_URL
+// Webhook URL: https://qilichess.com/api/billing/webhook
 import {
   initializePersistence,
   persistenceInfo,
@@ -13,7 +13,6 @@ import {
 import { authenticateAccount } from "./identity-service.mjs";
 
 const TRIAL_DAYS = 7;
-const LS_API = "https://api.lemonsqueezy.com/v1";
 
 function json(response, status, payload) {
   response.writeHead(status, {
@@ -26,26 +25,32 @@ function json(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
+function paddleApiBase() {
+  return String(process.env.PADDLE_ENV || "").toLowerCase() === "sandbox"
+    ? "https://sandbox-api.paddle.com"
+    : "https://api.paddle.com";
+}
+
+function priceForPlan(plan) {
+  return plan === "monthly"
+    ? String(process.env.PADDLE_PRICE_MONTHLY || process.env.PADDLE_PRICE_ID_MONTHLY || "")
+    : String(process.env.PADDLE_PRICE_YEARLY || process.env.PADDLE_PRICE_ID_YEARLY || "");
+}
+
 function paymentsConfig() {
-  const provider = String(process.env.PAYMENTS_PROVIDER || "lemonsqueezy").toLowerCase();
-  const lemonReady = Boolean(
-    process.env.LEMONSQUEEZY_API_KEY
-    && process.env.LEMONSQUEEZY_STORE_ID
-    && process.env.LEMONSQUEEZY_VARIANT_MONTHLY
-    && process.env.LEMONSQUEEZY_VARIANT_YEARLY,
-  );
   const paddleReady = Boolean(
     process.env.PADDLE_API_KEY
-    && (process.env.PADDLE_PRICE_MONTHLY || process.env.PADDLE_PRICE_ID_MONTHLY)
-    && (process.env.PADDLE_PRICE_YEARLY || process.env.PADDLE_PRICE_ID_YEARLY),
+    && priceForPlan("monthly")
+    && priceForPlan("yearly"),
   );
-  const enabled = provider === "paddle" ? paddleReady : lemonReady;
   return {
-    provider: enabled ? provider : null,
-    enabled,
-    overlay: provider === "lemonsqueezy",
+    provider: paddleReady ? "paddle" : null,
+    enabled: paddleReady,
+    overlay: true,
     trialDays: TRIAL_DAYS,
     appUrl: process.env.APP_URL || "https://qilichess.com",
+    environment: String(process.env.PADDLE_ENV || "").toLowerCase() === "sandbox" ? "sandbox" : "production",
+    clientToken: paddleReady ? (process.env.PADDLE_CLIENT_TOKEN || null) : null,
     plans: {
       monthly: { id: "monthly", label: "月付", price: process.env.PREMIUM_PRICE_MONTHLY || "¥19", period: "/月" },
       yearly: { id: "yearly", label: "年付", price: process.env.PREMIUM_PRICE_YEARLY || "¥148", period: "/年" },
@@ -57,12 +62,6 @@ async function readRaw(request) {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
   return Buffer.concat(chunks);
-}
-
-function variantForPlan(plan) {
-  return plan === "monthly"
-    ? String(process.env.LEMONSQUEEZY_VARIANT_MONTHLY || "")
-    : String(process.env.LEMONSQUEEZY_VARIANT_YEARLY || "");
 }
 
 function safeCheckoutOrigin(origin) {
@@ -85,102 +84,133 @@ function safeCheckoutOrigin(origin) {
   return fallback;
 }
 
-async function createLemonCheckout(user, plan, origin, email) {
-  const variantId = variantForPlan(plan);
-  const storeId = String(process.env.LEMONSQUEEZY_STORE_ID || "");
-  const apiKey = process.env.LEMONSQUEEZY_API_KEY;
-  if (!variantId || !storeId || !apiKey) {
-    const error = new Error("支付尚未配置。请设置 Lemon Squeezy 的 API Key、Store ID 和两个 Variant ID。");
+async function createPaddleCheckout(user, plan, origin) {
+  const priceId = priceForPlan(plan);
+  const apiKey = process.env.PADDLE_API_KEY;
+  if (!priceId || !apiKey) {
+    const error = new Error("支付尚未配置。请设置 Paddle 的 API Key 和两个 Price ID。");
     error.statusCode = 503;
     throw error;
   }
   const redirect = `${safeCheckoutOrigin(origin)}/#profile`;
-  const response = await fetch(`${LS_API}/checkouts`, {
+  const payload = {
+    items: [{ price_id: priceId, quantity: 1 }],
+    custom_data: { user_id: user.id, plan },
+    checkout: { success_url: redirect },
+  };
+  const response = await fetch(`${paddleApiBase()}/transactions`, {
     method: "POST",
     headers: {
-      accept: "application/vnd.api+json",
-      "content-type": "application/vnd.api+json",
+      accept: "application/json",
+      "content-type": "application/json",
       authorization: `Bearer ${apiKey}`,
+      "paddle-version": "1",
     },
-    body: JSON.stringify({
-      data: {
-        type: "checkouts",
-        attributes: {
-          checkout_options: { embed: true, media: false, logo: true, button_color: "#ed482f" },
-          checkout_data: {
-            custom: { user_id: user.id },
-            email: email || user.email || undefined,
-            name: user.displayName || undefined,
-          },
-          product_options: {
-            redirect_url: redirect,
-            receipt_button_text: "回到棋理",
-            receipt_thank_you_note: "欢迎使用棋理 Pro。引擎评估和 AI Coach 已经打开。",
-          },
-        },
-        relationships: {
-          store: { data: { type: "stores", id: storeId } },
-          variant: { data: { type: "variants", id: variantId } },
-        },
-      },
-    }),
+    body: JSON.stringify(payload),
   });
-  const payload = await response.json().catch(() => ({}));
-  const url = payload?.data?.attributes?.url;
-  if (!response.ok || !url) {
-    const message = payload?.errors?.[0]?.detail || "无法创建结账页";
+  const body = await response.json().catch(() => ({}));
+  const transaction = body?.data;
+  const url = transaction?.checkout?.url;
+  if (!response.ok || !transaction?.id) {
+    const message = body?.error?.detail || "无法创建结账页";
     const error = new Error(message);
     error.statusCode = 502;
     throw error;
   }
-  return { url, provider: "lemonsqueezy" };
+  return {
+    url: url || null,
+    transactionId: transaction.id,
+    provider: "paddle",
+  };
 }
 
-function lemonSignatureOk(raw, signature) {
-  const secret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET;
-  if (!secret || !signature) return false;
-  const digest = createHmac("sha256", secret).update(raw).digest("hex");
+function paddleSignatureOk(raw, header) {
+  const secret = process.env.PADDLE_WEBHOOK_SECRET || process.env.PADDLE_NOTIFICATION_SECRET;
+  if (!secret || !header) return false;
+  const parts = {};
+  for (const piece of String(header).split(";")) {
+    const separator = piece.indexOf("=");
+    if (separator <= 0) continue;
+    parts[piece.slice(0, separator).trim()] = piece.slice(separator + 1).trim();
+  }
+  const ts = parts.ts;
+  const h1 = parts.h1;
+  if (!ts || !h1) return false;
+  const digest = createHmac("sha256", secret).update(`${ts}:${raw.toString("utf8")}`).digest("hex");
   const left = Buffer.from(digest);
-  const right = Buffer.from(String(signature));
+  const right = Buffer.from(h1);
   if (left.length !== right.length) return false;
   return timingSafeEqual(left, right);
 }
 
-function planFromVariant(variantId) {
-  if (String(variantId) === String(process.env.LEMONSQUEEZY_VARIANT_MONTHLY || "")) return "monthly";
-  if (String(variantId) === String(process.env.LEMONSQUEEZY_VARIANT_YEARLY || "")) return "yearly";
+function planFromPriceId(priceId) {
+  if (String(priceId) === priceForPlan("monthly")) return "monthly";
+  if (String(priceId) === priceForPlan("yearly")) return "yearly";
   return "yearly";
 }
 
-async function applyLemonSubscription(userId, attrs = {}, eventName = "") {
-  const status = String(attrs.status || "active");
-  const ended = ["expired", "unpaid"].includes(status) || eventName === "subscription_expired";
-  const periodEnd = attrs.ends_at || attrs.renews_at || null;
+function paddleUserId(data = {}) {
+  return data?.custom_data?.user_id
+    || data?.custom_data?.userId
+    || data?.transaction?.custom_data?.user_id
+    || null;
+}
+
+function paddlePriceId(data = {}) {
+  return data?.items?.[0]?.price?.id
+    || data?.items?.[0]?.price_id
+    || data?.subscription?.items?.[0]?.price?.id
+    || null;
+}
+
+function paddlePeriodEnd(data = {}) {
+  return data?.current_billing_period?.ends_at
+    || data?.next_billed_at
+    || data?.billing_period?.ends_at
+    || null;
+}
+
+async function applyPaddleSubscription(userId, data = {}, eventType = "") {
+  const status = String(data.status || "active");
+  const ended = ["canceled", "cancelled", "expired", "inactive"].includes(status)
+    && eventType === "subscription.canceled"
+    && !paddlePeriodEnd(data);
+  const periodEnd = paddlePeriodEnd(data);
   return upsertSubscription(userId, {
-    plan: ended ? "free" : planFromVariant(attrs.variant_id),
+    plan: ended ? "free" : planFromPriceId(paddlePriceId(data)),
     status: ended ? "expired" : status,
     source: "paid",
-    provider: "lemonsqueezy",
-    providerCustomerId: attrs.customer_id ? String(attrs.customer_id) : null,
-    providerSubscriptionId: attrs.id ? String(attrs.id) : null,
+    provider: "paddle",
+    providerCustomerId: data.customer_id ? String(data.customer_id) : null,
+    providerSubscriptionId: data.id ? String(data.id) : null,
     currentPeriodEnd: periodEnd ? new Date(periodEnd) : null,
-    trialEndsAt: attrs.trial_ends_at ? new Date(attrs.trial_ends_at) : null,
   });
 }
 
-async function handleLemonWebhook(raw, signature) {
-  if (!lemonSignatureOk(raw, signature)) {
+async function handlePaddleWebhook(raw, signature) {
+  if (!paddleSignatureOk(raw, signature)) {
     const error = new Error("Invalid webhook signature");
     error.statusCode = 401;
     throw error;
   }
   const payload = JSON.parse(raw.toString("utf8"));
-  const event = payload?.meta?.event_name || "";
-  const userId = payload?.meta?.custom_data?.user_id || payload?.meta?.custom_data?.userId;
-  const attrs = { ...(payload?.data?.attributes || {}), id: payload?.data?.id };
-  if (!userId) return { ignored: true, reason: "missing-user" };
-  if (event.startsWith("subscription_")) {
-    await applyLemonSubscription(userId, attrs, event);
+  const event = payload?.event_type || payload?.eventType || "";
+  const data = payload?.data || {};
+  const userId = paddleUserId(data);
+  if (!userId) return { ignored: true, reason: "missing-user", event };
+  if (event.startsWith("subscription.")) {
+    await applyPaddleSubscription(userId, data, event);
+  } else if (event === "transaction.completed") {
+    const subscriptionId = data.subscription_id || data.subscriptionId;
+    await upsertSubscription(userId, {
+      plan: planFromPriceId(paddlePriceId(data)),
+      status: "active",
+      source: "paid",
+      provider: "paddle",
+      providerCustomerId: data.customer_id ? String(data.customer_id) : null,
+      providerSubscriptionId: subscriptionId ? String(subscriptionId) : null,
+      currentPeriodEnd: paddlePeriodEnd(data) ? new Date(paddlePeriodEnd(data)) : null,
+    });
   }
   return { ok: true, event };
 }
@@ -199,7 +229,7 @@ async function handleBillingRequest(request, response) {
 
     if (request.method === "POST" && url.pathname === "/api/billing/webhook") {
       const raw = await readRaw(request);
-      const result = await handleLemonWebhook(raw, request.headers["x-signature"]);
+      const result = await handlePaddleWebhook(raw, request.headers["paddle-signature"]);
       json(response, 200, result);
       return true;
     }
@@ -224,12 +254,9 @@ async function handleBillingRequest(request, response) {
     if (request.method === "POST" && url.pathname === "/api/billing/checkout") {
       const user = await authenticateAccount(request);
       if (!user) throw Object.assign(new Error("登录后才能开通 Pro"), { statusCode: 401 });
-      if (String(process.env.PAYMENTS_PROVIDER || "lemonsqueezy").toLowerCase() === "paddle") {
-        throw Object.assign(new Error("Paddle 结账尚未接通。当前请使用 Lemon Squeezy。"), { statusCode: 501 });
-      }
       const body = JSON.parse((await readRaw(request)).toString("utf8") || "{}");
       const plan = body.plan === "monthly" ? "monthly" : "yearly";
-      const checkout = await createLemonCheckout(user, plan, body.origin, body.email);
+      const checkout = await createPaddleCheckout(user, plan, body.origin);
       json(response, 200, checkout);
       return true;
     }

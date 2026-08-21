@@ -323,29 +323,38 @@ async function startTrial() {
   }
 }
 
-async function loadLemonOverlay() {
-  if (window.LemonSqueezy?.Url?.Open) return window.LemonSqueezy;
-  if (!document.querySelector("script[data-qili-lemon]")) {
+let paddleInitialized = false;
+
+async function loadPaddleOverlay() {
+  if (!billingConfig.clientToken) return null;
+  if (window.Paddle?.Checkout && paddleInitialized) return window.Paddle;
+  if (!document.querySelector("script[data-qili-paddle]")) {
     await new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = "https://assets.lemonsqueezy.com/lemon.js";
-      script.defer = true;
-      script.dataset.qiliLemon = "1";
+      script.src = "https://cdn.paddle.com/paddle/v2/paddle.js";
+      script.async = true;
+      script.dataset.qiliPaddle = "1";
       script.onload = resolve;
       script.onerror = reject;
       document.head.appendChild(script);
     });
   }
-  window.createLemonSqueezy?.();
-  window.LemonSqueezy?.Setup?.({
-    eventHandler(event) {
-      if (event?.event === "Checkout.Success") {
-        void refresh();
-        closeModal();
-      }
-    },
-  });
-  return window.LemonSqueezy;
+  if (!window.Paddle?.Initialize) return null;
+  if (!paddleInitialized) {
+    const options = {
+      token: billingConfig.clientToken,
+      eventCallback(event) {
+        if (event?.name === "checkout.completed") {
+          void refresh();
+          closeModal();
+        }
+      },
+    };
+    if (billingConfig.environment === "sandbox") options.environment = "sandbox";
+    window.Paddle.Initialize(options);
+    paddleInitialized = true;
+  }
+  return window.Paddle;
 }
 
 function openCheckoutUrl(url) {
@@ -380,17 +389,29 @@ async function startCheckout(planId) {
         email: window.QiliAuth?.getPrimaryEmail?.() || undefined,
       }),
     });
-    if (!checkout?.url) throw new Error("没有拿到结账地址");
+    if (!checkout?.transactionId && !checkout?.url) throw new Error("没有拿到结账地址");
     try {
-      const lemon = await loadLemonOverlay();
-      if (checkout.provider === "lemonsqueezy" && lemon?.Url?.Open) {
-        lemon.Url.Open(checkout.url);
+      const paddle = await loadPaddleOverlay();
+      if (checkout.provider === "paddle" && paddle?.Checkout?.open && checkout.transactionId) {
+        const openPayload = {
+          transactionId: checkout.transactionId,
+          settings: {
+            displayMode: "overlay",
+            theme: "light",
+            locale: "zh-CN",
+            successUrl: `${window.location.origin}/#profile`,
+          },
+        };
+        const email = window.QiliAuth?.getPrimaryEmail?.();
+        if (email) openPayload.customer = { email };
+        paddle.Checkout.open(openPayload);
         setNote("请在结账页完成支付。完成后会自动回到棋理。");
         return;
       }
     } catch {
       /* overlay optional */
     }
+    if (!checkout.url) throw new Error("没有拿到结账地址");
     openCheckoutUrl(checkout.url);
     setNote("已打开结账页。支付完成后回到「我的」，Pro 会自动打开。");
   } catch (error) {
