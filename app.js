@@ -1805,6 +1805,10 @@ function switchPlatformView(viewName) {
     document.body.classList.remove("online-table-active");
   }
   if (target !== "play") closeBoardReplay();
+  if (document.body.classList.contains("in-app")) {
+    const next = `/#${target}`;
+    if (`${location.pathname}${location.hash}` !== next) history.replaceState(null, "", next);
+  }
 }
 
 window.XiangqiPlatform = { switchView: switchPlatformView };

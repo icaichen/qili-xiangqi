@@ -189,6 +189,13 @@ async function initialize() {
       await window.Clerk.load({
         ui: { ClerkUI: window.__internal_ClerkUICtor },
         localization: clerkZhCN,
+        afterSignOutUrl: "/",
+        appearance: {
+          layout: {
+            privacyPageUrl: "/privacy",
+            termsPageUrl: "/terms",
+          },
+        },
       });
 
       const sync = ({ user = window.Clerk.user, session = window.Clerk.session } = {}) => {
@@ -241,8 +248,9 @@ async function openSignIn() {
 
 async function signOut() {
   await initialize();
-  if (!window.Clerk) return;
-  await window.Clerk.signOut();
+  if (window.Clerk) await window.Clerk.signOut();
+  authState = { loaded: true, signedIn: false, user: null, session: null, error: null };
+  emitAuthState();
 }
 
 async function createPasskey() {

@@ -103,6 +103,15 @@ const KIDS_CHAPTERS = [
     lessonCount: 6,
     conceptIds: ["attack", "protection", "safe-capture", "recapture-risk", "exchange", "capture-safety"],
   },
+  {
+    id: "kids-checkmate",
+    order: 3,
+    title: "听见将军，找到最后一击",
+    adultStageIds: ["board-awareness", "checkmate"],
+    lessonStart: 18,
+    lessonCount: 6,
+    conceptIds: ["check-detection", "respond-check", "respond-check", "respond-check", "check-vs-mate", "mate-in-one"],
+  },
 ];
 
 function courseLesson(id, adultTitle, kidsTitle, objective, prerequisites = [], mastery = "5 个新局面至少 4/5。", reviewEvidence = []) {

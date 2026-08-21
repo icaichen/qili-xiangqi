@@ -233,14 +233,97 @@ if (!rules) {
       success: "判断正确！先看保护，再决定要不要吃，你已经开始像真正的棋手一样思考了。",
       finale: true,
     },
+    {
+      icon: "将",
+      title: "是谁在喊将军？",
+      subtitle: "看见将军",
+      prompt: "红帅正在被攻击。点出喊“将军”的那枚黑棋。",
+      tip: "先看帅所在的横线和直线。哪枚黑棋现在可以直接走到帅的位置？",
+      mode: "identify",
+      pieces: [[9, 4, "general", COLORS.RED], [5, 4, "pawn", COLORS.RED], [9, 0, "rook", COLORS.BLACK], [0, 3, "general", COLORS.BLACK]],
+      identify: [9, 0],
+      failure: "再沿着红帅所在的横线看一遍。中间没有棋子挡住谁？",
+      success: "看见了！黑车沿横线盯住红帅，这就是将军。",
+    },
+    {
+      icon: "逃",
+      title: "先让帅躲开",
+      subtitle: "应将方法一：逃",
+      prompt: "黑车正在将军。把红帅向左走一步，躲到安全位置。",
+      tip: "被将军时，先别做别的事。帅可以走到一个没有被攻击的九宫位置。",
+      mode: "move",
+      legal: true,
+      pieces: [[9, 4, "general", COLORS.RED], [5, 3, "pawn", COLORS.RED], [5, 4, "rook", COLORS.BLACK], [0, 3, "general", COLORS.BLACK]],
+      expected: [9, 4, 9, 3],
+      success: "安全了！“逃”是应对将军的一种办法。",
+    },
+    {
+      icon: "挡",
+      title: "派车来挡住",
+      subtitle: "应将方法二：挡",
+      prompt: "这次帅不用动。把红车走到帅的正前方，挡住黑车的直线。",
+      tip: "直线将军时，可以把一枚棋放进攻击线路，让对方看不到帅。",
+      mode: "move",
+      legal: true,
+      pieces: [[9, 4, "general", COLORS.RED], [8, 0, "rook", COLORS.RED], [5, 4, "rook", COLORS.BLACK], [0, 3, "general", COLORS.BLACK]],
+      expected: [8, 0, 8, 4],
+      success: "挡住了！红车站进攻击线路，红帅安全了。",
+    },
+    {
+      icon: "吃",
+      title: "把威胁拿掉",
+      subtitle: "应将方法三：吃",
+      prompt: "黑车离红帅太近了。用红帅直接吃掉它。",
+      tip: "如果将军的棋没有保护，而且吃完后帅很安全，就可以把威胁直接拿掉。",
+      mode: "move",
+      legal: true,
+      pieces: [[9, 4, "general", COLORS.RED], [8, 4, "rook", COLORS.BLACK], [0, 3, "general", COLORS.BLACK]],
+      expected: [9, 4, 8, 4],
+      success: "威胁消失了！“吃掉将军的棋”也是一种应将办法。",
+    },
+    {
+      icon: "路",
+      title: "他还有路可以逃",
+      subtitle: "将军不等于将死",
+      prompt: "黑将被红车将军了，但棋局还没结束。点出黑将唯一的安全出口。",
+      tip: "将军以后，要检查所有逃、挡、吃。只要还有一种合法回应，就不是将死。",
+      mode: "identify",
+      pieces: [[9, 4, "general", COLORS.RED], [5, 4, "pawn", COLORS.RED], [2, 4, "rook", COLORS.RED], [0, 4, "general", COLORS.BLACK], [0, 5, "rook", COLORS.BLACK]],
+      identify: [0, 3],
+      failure: "黑将不能走进红车控制的直线，也不能走到自己棋子占着的位置。再找一个空着的安全点。",
+      success: "找到了！黑将还能逃到左边，所以这是将军，还不是将死。",
+    },
+    {
+      icon: "胜",
+      title: "关住所有出口",
+      subtitle: "完成一步将死",
+      prompt: "把左边的红车送到星星位置。它会将军，另一辆红车会守住黑将的出口。",
+      tip: "将死要同时做到两件事：将军，而且不给对方留下任何合法回应。",
+      mode: "move",
+      legal: true,
+      verifyMate: true,
+      pieces: [[9, 4, "general", COLORS.RED], [5, 4, "pawn", COLORS.RED], [2, 0, "rook", COLORS.RED], [1, 8, "rook", COLORS.RED], [0, 4, "general", COLORS.BLACK]],
+      expected: [2, 0, 0, 0],
+      success: "将死！一辆车将军，另一辆车守住出口，黑将没有任何合法回应。",
+      finale: true,
+    },
   ];
 
-  const [CHAPTER1_META, CHAPTER2_META] = KIDS_CHAPTERS;
+  const [CHAPTER1_META, CHAPTER2_META, CHAPTER3_META] = KIDS_CHAPTERS;
   const CHAPTER1_COUNT = CHAPTER1_META.lessonCount;
   const CHAPTER2_START = CHAPTER2_META.lessonStart;
   const CHAPTER2_COUNT = CHAPTER2_META.lessonCount;
-  const CHAPTER2_END = CHAPTER2_START + CHAPTER2_COUNT;
+  const CHAPTER3_START = CHAPTER3_META.lessonStart;
+  const CHAPTER3_COUNT = CHAPTER3_META.lessonCount;
+  const CHAPTER3_END = CHAPTER3_START + CHAPTER3_COUNT;
   const conceptIds = KIDS_CHAPTERS.flatMap((chapter) => chapter.conceptIds);
+  const chapterLayoutValid = KIDS_CHAPTERS.every((chapter, index) => {
+    const expectedStart = KIDS_CHAPTERS.slice(0, index).reduce((total, entry) => total + entry.lessonCount, 0);
+    return chapter.lessonStart === expectedStart && chapter.lessonCount === chapter.conceptIds.length;
+  });
+  if (!chapterLayoutValid || conceptIds.length !== LESSONS.length) {
+    console.warn("Qili Kids: chapter metadata and playable lessons are out of sync");
+  }
   LESSONS.forEach((lesson, index) => {
     lesson.conceptId = conceptIds[index] || null;
   });
@@ -249,10 +332,11 @@ if (!rules) {
   const savedProgress = Number(localStorage.getItem(progressKey) || 0);
   const savedVersion = Number(localStorage.getItem(progressVersionKey) || 1);
   let completed;
-  if (savedVersion < 3) {
+  if (savedVersion < 4) {
     if (savedVersion < 2) completed = savedProgress >= 9 ? CHAPTER1_COUNT : 0;
-    else completed = Math.max(0, Math.min(CHAPTER1_COUNT, savedProgress));
-    localStorage.setItem(progressVersionKey, "3");
+    else if (savedVersion < 3) completed = Math.max(0, Math.min(CHAPTER1_COUNT, savedProgress));
+    else completed = Math.max(0, Math.min(LESSONS.length, savedProgress));
+    localStorage.setItem(progressVersionKey, "4");
     localStorage.setItem(progressKey, String(completed));
   } else {
     completed = Math.max(0, Math.min(LESSONS.length, savedProgress));
@@ -275,7 +359,7 @@ if (!rules) {
   }
 
   function saveProgress() {
-    localStorage.setItem(progressVersionKey, "3");
+    localStorage.setItem(progressVersionKey, "4");
     localStorage.setItem(progressKey, String(completed));
   }
 
@@ -285,7 +369,8 @@ if (!rules) {
 
   function chapterFor(index) {
     if (index < CHAPTER2_START) return { number: 1, start: 0, count: CHAPTER1_COUNT };
-    return { number: 2, start: CHAPTER2_START, count: CHAPTER2_COUNT };
+    if (index < CHAPTER3_START) return { number: 2, start: CHAPTER2_START, count: CHAPTER2_COUNT };
+    return { number: 3, start: CHAPTER3_START, count: CHAPTER3_COUNT };
   }
 
   function chapterCompletedCount(start, count) {
@@ -364,8 +449,10 @@ if (!rules) {
   function renderMap() {
     const chapter1Completed = chapterCompletedCount(0, CHAPTER1_COUNT);
     const chapter2Completed = chapterCompletedCount(CHAPTER2_START, CHAPTER2_COUNT);
+    const chapter3Completed = chapterCompletedCount(CHAPTER3_START, CHAPTER3_COUNT);
     const chapter1Done = chapter1Completed >= CHAPTER1_COUNT;
     const chapter2Done = chapter2Completed >= CHAPTER2_COUNT;
+    const chapter3Done = chapter3Completed >= CHAPTER3_COUNT;
     const nextIndex = Math.min(completed, LESSONS.length - 1);
     function renderNodes(start, count, unlocked) {
       return LESSONS.slice(start, start + count).map((lesson, offset) => {
@@ -386,11 +473,12 @@ if (!rules) {
 
     const chapter1Nodes = renderNodes(0, CHAPTER1_COUNT, true);
     const chapter2Nodes = renderNodes(CHAPTER2_START, CHAPTER2_COUNT, chapter1Done);
-    const heroEyebrow = !chapter1Done ? "第一章 · 第一次走进象棋世界" : !chapter2Done ? "第二章 · 学会吃子和保护自己" : "前两章完成";
-    const heroTitle = !chapter1Done ? "一起认识棋盘上的新朋友" : !chapter2Done ? "开始像棋手一样看威胁" : "你已经学会先看、再吃、再计算";
-    const heroText = !chapter1Done ? "每次只学一个小规则。点棋盘、走一步、马上知道自己为什么做对。" : !chapter2Done ? "这一章不再只问棋子怎么走，而是练习攻击、保护、反吃和交换。" : "你已经完成基础规则和第一轮棋局思考训练。";
-    const heroAction = !chapter1Done ? (completed ? "继续第一章" : "开始第一关") : !chapter2Done ? (chapter2Completed ? "继续第二章" : "开始第二章") : "重新挑战第二章";
-    const resumeIndex = chapter2Done ? CHAPTER2_START : nextIndex;
+    const chapter3Nodes = renderNodes(CHAPTER3_START, CHAPTER3_COUNT, chapter2Done);
+    const heroEyebrow = !chapter1Done ? "第一章 · 第一次走进象棋世界" : !chapter2Done ? "第二章 · 学会吃子和保护自己" : !chapter3Done ? "第三章 · 听见将军，找到最后一击" : "前三章完成";
+    const heroTitle = !chapter1Done ? "一起认识棋盘上的新朋友" : !chapter2Done ? "开始像棋手一样看威胁" : !chapter3Done ? "学会救帅，也学会赢下一局" : "你已经能看危险、救帅和完成将死";
+    const heroText = !chapter1Done ? "每次只学一个小规则。点棋盘、走一步、马上知道自己为什么做对。" : !chapter2Done ? "这一章不再只问棋子怎么走，而是练习攻击、保护、反吃和交换。" : !chapter3Done ? "从看见将军开始，一次练一种应对办法，最后亲手完成一步将死。" : "你已经完成规则、安全和第一轮将杀训练。";
+    const heroAction = !chapter1Done ? (completed ? "继续第一章" : "开始第一关") : !chapter2Done ? (chapter2Completed ? "继续第二章" : "开始第二章") : !chapter3Done ? (chapter3Completed ? "继续第三章" : "开始第三章") : "再挑战一步将死";
+    const resumeIndex = chapter3Done ? CHAPTER3_END - 1 : nextIndex;
 
     renderShell(`
       <main class="kids-map-page">
@@ -425,6 +513,15 @@ if (!rules) {
           </div>
           <div class="kids-progress-track"><i style="width:${(chapter2Completed / CHAPTER2_COUNT) * 100}%"></i></div>
           <div class="kids-path">${chapter2Nodes}</div>
+        </section>
+
+        <section class="kids-chapter-card">
+          <div class="kids-chapter-head">
+            <div><span>CHAPTER 3</span><h2>听见将军，找到最后一击</h2><p>练习逃、挡、吃，再亲手完成一步将死。</p></div>
+            <div class="kids-chapter-progress"><strong>${chapter3Completed}</strong><span>/ ${CHAPTER3_COUNT} 颗星</span></div>
+          </div>
+          <div class="kids-progress-track"><i style="width:${(chapter3Completed / CHAPTER3_COUNT) * 100}%"></i></div>
+          <div class="kids-path">${chapter3Nodes}</div>
         </section>
       </main>`);
 
@@ -526,28 +623,38 @@ if (!rules) {
   }
 
   function renderComplete() {
-    const secondChapter = lessonIndex >= CHAPTER2_START;
-    const starCount = secondChapter ? CHAPTER2_COUNT : CHAPTER1_COUNT;
-    const replayIndex = secondChapter ? CHAPTER2_END - 1 : CHAPTER1_COUNT - 1;
+    const chapter = chapterFor(lessonIndex);
+    const chapterMeta = KIDS_CHAPTERS[chapter.number - 1];
+    const starCount = chapter.count;
+    const replayIndex = chapter.start + chapter.count - 1;
+    const nextChapter = KIDS_CHAPTERS[chapter.number];
+    const completionCopy = chapter.number === 1
+      ? "你已经认识棋盘、会走第一批棋子，也完成了第一次将死。"
+      : chapter.number === 2
+        ? "你已经开始会看攻击、保护、反吃和交换，而不是看到能吃就马上吃。"
+        : "你已经会看见将军，用逃、挡、吃来救帅，也能判断将军和将死。";
+    const skillTags = chapter.number === 1
+      ? "<span>帅与九宫</span><span>车、马、炮、兵</span><span>将军与应将</span><span>将帅不能照面</span>"
+      : chapter.number === 2
+        ? "<span>看见攻击</span><span>找到保护</span><span>识别反吃</span><span>理解交换</span>"
+        : "<span>看见将军</span><span>逃、挡、吃</span><span>区分将军与将死</span><span>一步将死</span>";
     const stars = Array.from({ length: starCount }, () => "<span>★</span>").join("");
     renderShell(`
       <main class="kids-complete-page">
         <section class="kids-complete-card">
           <div class="kids-complete-stars" aria-label="${starCount} 颗学习星星">${stars}</div>
-          <span class="kids-eyebrow">${secondChapter ? "第二章完成" : "第一章完成"}</span>
-          <h1>${secondChapter ? "第二章通关！" : "第一章通关！"}</h1>
-          <p>${secondChapter ? "你已经开始会看攻击、保护、反吃和交换，而不是看到能吃就马上吃。" : "你已经认识棋盘、会走第一批棋子，也完成了第一次将死。"}</p>
-          <div class="kids-complete-skills">
-            ${secondChapter ? "<span>看见攻击</span><span>找到保护</span><span>识别反吃</span><span>理解交换</span>" : "<span>帅与九宫</span><span>车、马、炮、兵</span><span>将军与应将</span><span>将帅不能照面</span>"}
-          </div>
+          <span class="kids-eyebrow">第${["一", "二", "三"][chapter.number - 1]}章完成</span>
+          <h1>${chapterMeta.title} · 通关！</h1>
+          <p>${completionCopy}</p>
+          <div class="kids-complete-skills">${skillTags}</div>
           <div class="kids-complete-actions">
-            ${secondChapter ? '<button class="kids-primary-action" data-complete-map>回到学习地图</button>' : '<button class="kids-primary-action" data-complete-next>开始第二章</button><button class="kids-secondary-action" data-complete-map>回到学习地图</button>'}
+            ${nextChapter ? `<button class="kids-primary-action" data-complete-next>开始第${["二", "三"][chapter.number - 1]}章</button><button class="kids-secondary-action" data-complete-map>回到学习地图</button>` : '<button class="kids-primary-action" data-complete-map>回到学习地图</button>'}
             <button class="kids-secondary-action" data-complete-replay>再挑战最后一局</button>
           </div>
         </section>
       </main>`);
     kidsView.querySelector("[data-complete-map]")?.addEventListener("click", () => { screen = "map"; render(); });
-    kidsView.querySelector("[data-complete-next]")?.addEventListener("click", () => startLesson(CHAPTER2_START));
+    kidsView.querySelector("[data-complete-next]")?.addEventListener("click", () => startLesson(nextChapter.lessonStart));
     kidsView.querySelector("[data-complete-replay]")?.addEventListener("click", () => startLesson(replayIndex));
   }
 
@@ -619,6 +726,14 @@ if (!rules) {
     if (lesson.verifyCheck && !isInCheck(board, COLORS.BLACK)) {
       fail("还没有形成将军", "这一步虽然能走，但黑将还没有真正受到攻击。" );
       return;
+    }
+
+    if (lesson.verifyMate) {
+      const checkmate = isInCheck(board, COLORS.BLACK) && generateLegalMoves(board, COLORS.BLACK).length === 0;
+      if (!checkmate) {
+        fail("还没有将死", "黑方还有合法回应。重新试一次，看看怎样同时将军并守住出口。" );
+        return;
+      }
     }
 
     if (lesson.mode === "mini-game") {

@@ -152,9 +152,11 @@ function renderAuthControls() {
   const passkey = document.querySelector("#profileAddPasskey");
   const status = document.querySelector("#profileAuthStatus");
 
-  if (signIn) signIn.classList.toggle("hidden", !auth.enabled || registered);
+  if (signIn) signIn.classList.toggle("hidden", registered);
   if (signOut) signOut.classList.toggle("hidden", !registered);
   if (passkey) passkey.classList.toggle("hidden", !registered);
+  const guestBar = document.querySelector("#guestSessionBar");
+  if (guestBar) guestBar.classList.toggle("hidden", Boolean(auth.signedIn || registered));
 
   if (status) {
     if (!auth.loaded) status.textContent = "正在检查登录服务…";
@@ -1844,7 +1846,7 @@ document.querySelector("#profileSaveName")?.addEventListener("click", async () =
   }
 });
 
-document.querySelector("#profileSignIn")?.addEventListener("click", async () => {
+async function openProfileSignIn() {
   const status = document.querySelector("#profileAuthStatus");
   try {
     if (status) status.textContent = "正在打开登录…";
@@ -1852,6 +1854,12 @@ document.querySelector("#profileSignIn")?.addEventListener("click", async () => 
   } catch (error) {
     if (status) status.textContent = error.message;
   }
+}
+
+document.querySelector("#profileSignIn")?.addEventListener("click", () => void openProfileSignIn());
+document.querySelector("#topbarSignIn")?.addEventListener("click", () => {
+  if (window.QiliShell?.openSignIn) void window.QiliShell.openSignIn(document.querySelector("#topbarSignIn"));
+  else void openProfileSignIn();
 });
 
 document.querySelector("#profileSignOut")?.addEventListener("click", async () => {

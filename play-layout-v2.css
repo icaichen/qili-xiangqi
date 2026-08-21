@@ -777,6 +777,22 @@ body:is(.play-mode, .analysis-mode) .app-shell {
     display: none;
   }
 
+  body:is(.play-mode, .analysis-mode) .guest-session-bar {
+    display: flex;
+    margin: 0 0 0 auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  body:is(.play-mode, .analysis-mode) .guest-session-bar.hidden {
+    display: none !important;
+  }
+
+  body:is(.play-mode, .analysis-mode) .guest-session-bar span {
+    display: none;
+  }
+
   :is(#playView, #analysisView).play-workspace {
     display: flex;
     flex-direction: column;

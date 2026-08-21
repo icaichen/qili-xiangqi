@@ -34,14 +34,20 @@
     <link rel="stylesheet" href="/landing.css" />
   </head>
   <body class="auth-pending">
+    <div id="bootSplash" class="boot-splash" role="status">
+      <span class="landing-brand-mark">帅</span>
+      <strong>棋理</strong>
+      <small>正在进入…</small>
+    </div>
     <div id="landingPage" class="landing-page" hidden>
       <header class="landing-nav" aria-label="首页导航">
-        <a class="landing-brand" href="#landingTop" aria-label="棋理首页">
+        <a class="landing-brand" href="/" aria-label="棋理首页">
           <span class="landing-brand-mark">帅</span>
           <span class="landing-brand-copy"><strong>棋理</strong><small>QILI XIANGQI</small></span>
         </a>
         <div class="landing-nav-actions">
           <a href="#landingFeatures">看看能做什么</a>
+          <a href="/pricing">定价</a>
           <button class="landing-login" type="button" data-landing-action="signin">登录</button>
         </div>
       </header>
@@ -60,7 +66,7 @@
                 先体验人机对局
               </button>
             </div>
-            <p class="landing-no-card">无需付费 · 游客也能玩 · 支持手机与电脑</p>
+            <p class="landing-no-card">免费注册 · 想先试试棋盘请点「先体验人机对局」</p>
           </div>
 
           <div class="landing-game-scene" aria-label="棋理对局与 AI 复盘示例">
@@ -155,18 +161,154 @@
         </section>
       </main>
 
-      <footer class="landing-footer"><div class="landing-brand"><span class="landing-brand-mark">帅</span><span class="landing-brand-copy"><strong>棋理</strong><small>QILI XIANGQI</small></span></div><p>在线对弈 · AI 复盘 · 个性训练</p><span>© 2026 棋理 Qili</span></footer>
+      <footer class="landing-footer">
+        <a class="landing-brand" href="/" aria-label="棋理首页">
+          <span class="landing-brand-mark">帅</span>
+          <span class="landing-brand-copy"><strong>棋理</strong><small>QILI XIANGQI</small></span>
+        </a>
+        <nav class="landing-footer-links" aria-label="网站信息">
+          <a href="/pricing">定价</a>
+          <a href="/privacy">隐私政策</a>
+          <a href="/terms">使用条款</a>
+        </nav>
+        <span>© 2026 棋理 Qili</span>
+      </footer>
       <div id="landingToast" class="landing-toast" role="status" aria-live="polite"></div>
+    </div>
+
+    <div id="legalPage" class="legal-page" hidden>
+      <header class="landing-nav" aria-label="文档导航">
+        <a class="landing-brand" href="/" data-legal-home aria-label="棋理首页">
+          <span class="landing-brand-mark">帅</span>
+          <span class="landing-brand-copy"><strong>棋理</strong><small>QILI XIANGQI</small></span>
+        </a>
+        <div class="landing-nav-actions">
+          <a href="/pricing">定价</a>
+          <a href="/privacy">隐私</a>
+          <a href="/terms">条款</a>
+          <button class="landing-login" type="button" data-legal-app hidden>进入棋理</button>
+          <button class="landing-login" type="button" data-landing-action="signin">登录</button>
+        </div>
+      </header>
+      <main class="legal-main">
+        <article id="legalPricing" class="legal-article" hidden>
+          <p class="legal-kicker">棋理 Pro</p>
+          <h1>免费是棋桌，Pro 是老师</h1>
+          <p class="legal-lede">下棋、学习、儿童模式和回放棋谱始终免费。评估条、首选着和 AI 讲解是可选的老师。</p>
+          <div class="legal-price-grid">
+            <section>
+              <h2>免费</h2>
+              <p class="legal-price-tag"><strong>¥0</strong><span>永久</span></p>
+              <ul>
+                <li>和电脑、真人下棋</li>
+                <li>学习中心</li>
+                <li>儿童模式</li>
+                <li>历史棋局与逐手回放</li>
+                <li>摆盘研究</li>
+              </ul>
+            </section>
+            <section class="recommended">
+              <h2>棋理 Pro</h2>
+              <p class="legal-price-tag"><strong>¥19</strong><span>/ 月</span></p>
+              <p class="legal-price-alt">或 <b>¥148 / 年</b> · 约 ¥12.3 / 月</p>
+              <ul>
+                <li>包含全部免费功能</li>
+                <li>AI Coach 讲解每一步为什么</li>
+                <li>评估条、首选着、候选着</li>
+                <li>整盘 Pikafish 引擎复盘</li>
+                <li>登录后可试用 7 天，每个账号一次</li>
+              </ul>
+            </section>
+          </div>
+          <div class="legal-cta-row">
+            <button class="landing-cta landing-cta-primary" type="button" data-pricing-cta>开通 Pro 或试用 7 天</button>
+            <button class="landing-cta landing-cta-secondary" type="button" data-landing-action="guest">先体验免费下棋</button>
+          </div>
+          <p class="legal-note">付款由 Paddle 作为销售方处理（含税费与发票）。中国大陆用户可使用国际卡；支付宝订阅需 Paddle 开通后才会出现。微信支付目前不能用于月付/年付。儿童模式不收费。</p>
+        </article>
+        <article id="legalPrivacy" class="legal-article" hidden>
+          <p class="legal-kicker">法律信息</p>
+          <h1>隐私政策</h1>
+          <p class="legal-lede">本政策说明棋理（qilichess.com）如何收集和使用信息。更新日期：2026 年 8 月 21 日。</p>
+          <h2>我们是谁</h2>
+          <p>棋理是面向中国象棋的在线对弈与学习网站，由个人开发者运营。我们没有单独的公司主体。支付由 Paddle 作为 Merchant of Record（销售记录方）处理。</p>
+          <h2>我们收集什么</h2>
+          <ul>
+            <li><b>账号信息：</b>你用邮箱、Google 或 Passkey 登录时，登录服务 Clerk 会处理邮箱和登录凭证。我们保存你的棋手昵称，以及与该账号绑定的棋手身份。</li>
+            <li><b>对局与棋力：</b>电脑局、真人对局、着法、结果，以及 Rapid / Blitz / Bullet 的 Qili 棋力分。</li>
+            <li><b>游客身份：</b>未登录时，浏览器里会保存游客令牌，用于本机继续下棋。登录时可以把这份记录认领到正式账号。</li>
+            <li><b>订阅状态：</b>是否开通棋理 Pro、试用是否用过、到期时间。我们不保存完整银行卡号。</li>
+            <li><b>技术日志：</b>为了运行服务，主机可能记录 IP、浏览器类型和错误信息，用于排障和防止滥用。</li>
+          </ul>
+          <h2>我们怎么用</h2>
+          <p>这些信息只用来提供下棋、复盘、学习、棋力分和会员功能，以及保障服务安全。我们不会把你的对局或邮箱卖给第三方做广告。</p>
+          <h2>第三方</h2>
+          <ul>
+            <li><b>Clerk：</b>登录与会话。</li>
+            <li><b>Paddle：</b>付款、发票、税务。付款资料由 Paddle 按其隐私政策处理。</li>
+            <li><b>托管服务：</b>网站与数据库的运行环境。</li>
+          </ul>
+          <h2>儿童</h2>
+          <p>儿童模式是给孩子学规则的免费功能，不要求孩子单独注册。请由监护人决定是否创建正式账号。我们不会故意向儿童收集超出提供教学所需的信息。</p>
+          <h2>Cookie 与本地存储</h2>
+          <p>登录会话、游客令牌、棋局缓存和界面偏好会存在浏览器中。关闭 Cookie 或清除站点数据后，未登录的游客记录可能丢失。</p>
+          <h2>保留与删除</h2>
+          <p>正式账号的对局和棋力分会随账号保留，便于你在其他设备恢复。你可以退出登录；游客数据只留在当前浏览器。如需删除正式账号及相关对局记录，请通过网站「我的」页面联系我们，我们会在合理期限内处理。</p>
+          <h2>你的选择</h2>
+          <p>你可以不登录、只以游客下棋。你可以不开通 Pro。你可以随时取消订阅（由 Paddle 管理续费与取消）。</p>
+          <h2>变更</h2>
+          <p>政策更新后会写在本页，并更新日期。若变更实质影响你的权利，我们会尽量在网站内提示。</p>
+        </article>
+        <article id="legalTerms" class="legal-article" hidden>
+          <p class="legal-kicker">法律信息</p>
+          <h1>使用条款</h1>
+          <p class="legal-lede">使用棋理（qilichess.com）即表示你同意以下条款。更新日期：2026 年 8 月 21 日。</p>
+          <h2>服务内容</h2>
+          <p>棋理提供中国象棋对弈（真人和电脑）、学习、儿童模式、棋谱回放，以及可选的棋理 Pro（AI Coach、引擎评估、整盘引擎复盘）。免费功能可以一直用。网站按「现状」提供，可能有维护、中断或改版。</p>
+          <h2>账号</h2>
+          <p>游客身份只存在当前浏览器。正式账号用于跨设备恢复棋局和棋力分。你需要为账号下的行为负责，并保证登录邮箱真实可用。禁止盗用他人账号、批量注册或绕过试用限制。</p>
+          <h2>对局与公平</h2>
+          <p>真人匹配时请正常对弈。禁止辱骂、恶意拖延、利用程序漏洞，或在对局中使用本站 Pro 引擎去辅助你对真人。电脑对局可以使用引擎提示，那是教学功能。棋力分仅供参考，不是官方段位。</p>
+          <h2>棋理 Pro 与付款</h2>
+          <p>价格为每月 ¥19 或每年 ¥148。登录后每个账号可以试用 7 天一次。付款、发票、税务和退款由 Paddle 处理，并适用 Paddle 的买家条款。取消订阅后，已支付周期结束前仍可使用 Pro。我们不在服务器上保存你的完整卡号。</p>
+          <h2>儿童模式</h2>
+          <p>儿童模式免费，与成人 Pro 功能分开。请监护人陪同年幼孩子使用网络服务，并决定是否登录正式账号。</p>
+          <h2>知识产权</h2>
+          <p>棋理的名称、界面和原创内容归运营者所有。中国象棋规则与棋子本身是公共文化。你在本站产生的对局记录，授权我们用于向你展示历史、复盘和棋力计算。</p>
+          <h2>免责</h2>
+          <p>引擎分析、AI 讲解和棋力分可能有误，不能替代教练或比赛裁决。在法律允许范围内，运营者对间接损失、数据丢失或服务中断不承担责任；对必须承担的责任，以你就相关功能已支付的费用为上限（免费使用则为零）。</p>
+          <h2>终止</h2>
+          <p>严重作弊、攻击服务或滥用接口时，我们可能限制或关闭账号。你可以随时停止使用并退出登录。</p>
+          <h2>条款变更</h2>
+          <p>更新后的条款公布在本页后生效。若你继续使用，即视为接受更新后的条款。</p>
+        </article>
+      </main>
+      <footer class="landing-footer">
+        <a class="landing-brand" href="/" aria-label="棋理首页">
+          <span class="landing-brand-mark">帅</span>
+          <span class="landing-brand-copy"><strong>棋理</strong><small>QILI XIANGQI</small></span>
+        </a>
+        <nav class="landing-footer-links" aria-label="网站信息">
+          <a href="/pricing">定价</a>
+          <a href="/privacy">隐私政策</a>
+          <a href="/terms">使用条款</a>
+        </nav>
+        <span>© 2026 棋理 Qili</span>
+      </footer>
     </div>
 
     <div class="app-shell">
       <header class="topbar">
-        <div class="brand">
+        <a class="brand" id="appBrand" href="/#home" aria-label="棋理">
           <div class="brand-mark">帅</div>
           <div>
             <strong>棋理</strong>
             <span>中国象棋 · XIANGQI</span>
           </div>
+        </a>
+        <div id="guestSessionBar" class="guest-session-bar hidden">
+          <span>游客</span>
+          <button id="topbarSignIn" class="button button-primary" type="button">登录</button>
         </div>
         <nav class="platform-nav" aria-label="平台导航">
           <button class="platform-nav-item active" data-view="home">首页</button>
@@ -647,6 +789,11 @@
                 <button id="profileSignOut" class="button button-ghost hidden">退出登录</button>
               </div>
               <small id="profileAuthStatus">正在检查登录服务…</small>
+              <nav class="profile-legal-links">
+                <a href="/pricing">定价</a>
+                <a href="/privacy">隐私政策</a>
+                <a href="/terms">使用条款</a>
+              </nav>
             </div>
           </article>
           <article class="platform-surface profile-stat rating-stat"><span>Rapid · Qili</span><strong id="profileRapidRating">1500</strong><small id="profileRapidMeta">Qili 初始 1500 · 定级中 · 10 分钟及以上</small></article>
