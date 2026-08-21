@@ -742,12 +742,21 @@ async function startReview(game) {
   const flipped = game.color === "black";
   renderReviewBoard(reviewInitialBoard(), null, flipped);
   if (title) title.textContent = `vs ${game.opponent || "对手"} · ${game.color === "red" ? "执红" : "执黑"}`;
-  if (note) note.textContent = "Pikafish 正在逐步检查你自己的着法。";
-  if (status) status.textContent = "Pikafish 扫描中…";
+  if (note) note.textContent = window.QiliPremium?.can("engine") === false
+    ? "可以逐手回放。引擎评估和 AI 讲解是棋理 Pro。"
+    : "Pikafish 正在逐步检查你自己的着法。";
+  if (status) status.textContent = window.QiliPremium?.can("engine") === false ? "免费回放" : "Pikafish 扫描中…";
   if (results) results.classList.remove("hidden");
-  if (summary) summary.textContent = "正在扫描整盘，找评价变化最大的转折点。";
-  if (turns) turns.innerHTML = '<div class="review-empty">分析中。棋局越长，需要检查的用户着法越多。</div>';
+  if (summary) summary.textContent = window.QiliPremium?.can("engine") === false
+    ? "免费复盘只回放棋谱，不跑引擎。"
+    : "正在扫描整盘，找评价变化最大的转折点。";
+  if (turns) {
+    turns.innerHTML = window.QiliPremium?.can("engine") === false
+      ? (window.QiliPremium.lockedCardHtml("reviewScan") || '<div class="review-empty">引擎复盘是 Pro。</div>')
+      : '<div class="review-empty">分析中。棋局越长，需要检查的用户着法越多。</div>';
+  }
 
+  if (window.QiliPremium?.can("engine") === false) return;
   try {
     const analysis = await window.XiangqiEngineClient.analyzeGame(game, { depth: 7, maxPlayerMoves: 36 });
     if (requestId !== reviewRequestId) return;
@@ -757,6 +766,14 @@ async function startReview(game) {
     if (status) status.textContent = "复盘完成";
   } catch (error) {
     if (requestId !== reviewRequestId) return;
+    if (error?.status === 402 || error?.code === "pro-required") {
+      if (status) status.textContent = "免费回放";
+      if (summary) summary.textContent = "免费复盘只回放棋谱，不跑引擎。";
+      if (turns) turns.innerHTML = window.QiliPremium?.lockedCardHtml?.("reviewScan") || `<div class="review-empty">${escapeHtml(error.message)}</div>`;
+      if (note) note.textContent = "可以逐手回放。引擎评估和 AI 讲解是棋理 Pro。";
+      window.QiliPremium?.open?.("reviewScan");
+      return;
+    }
     if (status) status.textContent = "复盘失败";
     if (summary) summary.textContent = error.message;
     if (turns) turns.innerHTML = `<div class="review-empty">${escapeHtml(error.message)}</div>`;
@@ -1020,6 +1037,10 @@ function handleReviewRetryPoint(row, col) {
 }
 
 async function learnReviewTurningPoint() {
+  if (!window.QiliPremium?.can("coach")) {
+    window.QiliPremium?.require("coach");
+    return;
+  }
   if (!activeReviewGame) return;
   const point = activeReviewPoint();
   if (!point) return;
@@ -1395,14 +1416,25 @@ startReview = async function(game) {
   const flipped = game.color === 'black';
   renderReviewBoard(reviewInitialBoard(), null, flipped);
   if (title) title.textContent = (relativeResult(game) + ' · vs ' + (game.opponent || '对手'));
-  if (moveTitle) moveTitle.textContent = 'Pikafish 正在扫描整盘';
-  if (note) note.textContent = '扫描完成后可以逐手回放，并直接跳到关键失误。';
-  if (status) status.textContent = 'Pikafish 扫描中…';
-  if (coachTitle) coachTitle.textContent = '正在生成 Game Review';
-  if (coachContent) { coachContent.className = 'review-why-loading'; coachContent.textContent = '先检查你自己的每一步，再标出最值得回看的位置。'; }
+  if (moveTitle) moveTitle.textContent = window.QiliPremium?.can("engine") === false ? '逐手回放' : 'Pikafish 正在扫描整盘';
+  if (note) note.textContent = window.QiliPremium?.can("engine") === false
+    ? '可以前后翻看自己的棋。引擎评估和 AI 讲解是棋理 Pro。'
+    : '扫描完成后可以逐手回放，并直接跳到关键失误。';
+  if (status) status.textContent = window.QiliPremium?.can("engine") === false ? '免费回放' : 'Pikafish 扫描中…';
+  if (coachTitle) coachTitle.textContent = window.QiliPremium?.can("engine") === false ? '免费复盘' : '正在生成 Game Review';
+  if (coachContent) {
+    if (window.QiliPremium?.can("engine") === false) {
+      coachContent.className = 'review-why-content';
+      coachContent.innerHTML = window.QiliPremium.lockedCardHtml("reviewScan");
+    } else {
+      coachContent.className = 'review-why-loading';
+      coachContent.textContent = '先检查你自己的每一步，再标出最值得回看的位置。';
+    }
+  }
   renderRawMoveListDuringScan();
   renderReviewEvalGraph();
   updateReviewPlaybackControls();
+  if (window.QiliPremium?.can("engine") === false) return;
   try {
     const analysis = await window.XiangqiEngineClient.analyzeGame(game, { depth: 7, maxPlayerMoves: 36 });
     if (requestId !== reviewRequestId) return;
@@ -1412,6 +1444,17 @@ startReview = async function(game) {
     if (status) status.textContent = '复盘完成';
   } catch (error) {
     if (requestId !== reviewRequestId) return;
+    if (error?.status === 402 || error?.code === "pro-required") {
+      if (status) status.textContent = '免费回放';
+      if (coachTitle) coachTitle.textContent = '免费复盘';
+      if (coachContent) {
+        coachContent.className = 'review-why-content';
+        coachContent.innerHTML = window.QiliPremium?.lockedCardHtml?.("reviewScan") || error.message;
+      }
+      if (note) note.textContent = '可以前后翻看自己的棋。引擎评估和 AI 讲解是棋理 Pro。';
+      window.QiliPremium?.open?.("reviewScan");
+      return;
+    }
     if (status) status.textContent = '复盘失败';
     if (coachTitle) coachTitle.textContent = '复盘失败';
     if (coachContent) coachContent.textContent = error.message;

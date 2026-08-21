@@ -249,6 +249,22 @@ async function initializePersistence() {
       await pgPool.query("CREATE INDEX IF NOT EXISTS online_games_red_user_idx ON online_games (red_user_id, finished_at DESC)");
       await pgPool.query("CREATE INDEX IF NOT EXISTS online_games_black_user_idx ON online_games (black_user_id, finished_at DESC)");
       await pgPool.query("CREATE INDEX IF NOT EXISTS qili_ratings_user_idx ON qili_ratings (user_id)");
+
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS qili_subscriptions (
+          user_id TEXT PRIMARY KEY REFERENCES qili_users(id) ON DELETE CASCADE,
+          plan TEXT NOT NULL DEFAULT 'free',
+          status TEXT NOT NULL DEFAULT 'free',
+          source TEXT,
+          provider TEXT,
+          provider_customer_id TEXT,
+          provider_subscription_id TEXT,
+          current_period_end TIMESTAMPTZ,
+          trial_ends_at TIMESTAMPTZ,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+
       state.postgresReady = true;
     } catch (error) {
       console.error("[postgres-init]", error);
@@ -701,6 +717,108 @@ async function getFinishedGame(id) {
   };
 }
 
+function subscriptionToEntitlement(row) {
+  if (!row) {
+    return { plan: "free", source: null, status: "free", pro: false, expiresAt: null, provider: null, planId: null, trialUsed: false };
+  }
+  const now = Date.now();
+  const periodEnd = row.current_period_end ? new Date(row.current_period_end).getTime() : null;
+  const trialEnd = row.trial_ends_at ? new Date(row.trial_ends_at).getTime() : null;
+  const expiresAt = periodEnd || trialEnd;
+  const liveStatus = String(row.status || "");
+  const stillPaid = ["active", "on_trial", "trialing", "cancelled", "canceled", "past_due", "paused"].includes(liveStatus)
+    && (!expiresAt || expiresAt > now);
+  const stillTrial = row.source === "trial" && trialEnd && trialEnd > now;
+  const pro = stillPaid || stillTrial;
+  const trialUsed = Boolean(row.trial_ends_at || row.source === "trial" || row.source === "paid");
+  return {
+    plan: pro ? "pro" : "free",
+    source: row.source || row.provider || null,
+    status: pro ? (stillTrial && !stillPaid ? "trial" : liveStatus || "active") : (row.source === "trial" ? "trial-ended" : "free"),
+    pro,
+    expiresAt,
+    provider: row.provider || null,
+    planId: row.plan || null,
+    trialUsed,
+  };
+}
+
+async function getSubscription(userId) {
+  if (!state.postgresReady || !pgPool || !userId) return subscriptionToEntitlement(null);
+  const result = await pgPool.query(
+    `SELECT user_id, plan, status, source, provider, provider_customer_id, provider_subscription_id,
+            current_period_end, trial_ends_at, updated_at
+       FROM qili_subscriptions WHERE user_id = $1`,
+    [userId],
+  );
+  return subscriptionToEntitlement(result.rows[0] || null);
+}
+
+async function upsertSubscription(userId, fields) {
+  if (!state.postgresReady || !pgPool || !userId) return null;
+  await pgPool.query(
+    `INSERT INTO qili_subscriptions (
+       user_id, plan, status, source, provider, provider_customer_id, provider_subscription_id,
+       current_period_end, trial_ends_at, updated_at
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+     ON CONFLICT (user_id) DO UPDATE SET
+       plan = EXCLUDED.plan,
+       status = EXCLUDED.status,
+       source = COALESCE(EXCLUDED.source, qili_subscriptions.source),
+       provider = COALESCE(EXCLUDED.provider, qili_subscriptions.provider),
+       provider_customer_id = COALESCE(EXCLUDED.provider_customer_id, qili_subscriptions.provider_customer_id),
+       provider_subscription_id = COALESCE(EXCLUDED.provider_subscription_id, qili_subscriptions.provider_subscription_id),
+       current_period_end = EXCLUDED.current_period_end,
+       trial_ends_at = COALESCE(EXCLUDED.trial_ends_at, qili_subscriptions.trial_ends_at),
+       updated_at = NOW()`,
+    [
+      userId,
+      fields.plan || "pro",
+      fields.status || "active",
+      fields.source || null,
+      fields.provider || null,
+      fields.providerCustomerId || null,
+      fields.providerSubscriptionId || null,
+      fields.currentPeriodEnd || null,
+      fields.trialEndsAt || null,
+    ],
+  );
+  return getSubscription(userId);
+}
+
+async function startServerTrial(userId) {
+  if (!userId) {
+    const error = new Error("登录后才能试用");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (!state.postgresReady || !pgPool) {
+    const error = new Error("订阅服务尚未就绪，请稍后重试");
+    error.statusCode = 503;
+    throw error;
+  }
+  const existing = await pgPool.query(
+    "SELECT source, status, trial_ends_at FROM qili_subscriptions WHERE user_id = $1",
+    [userId],
+  );
+  const row = existing.rows[0];
+  if (row?.source === "trial" || row?.source === "paid" || row?.trial_ends_at) {
+    const current = subscriptionToEntitlement(row);
+    if (current.pro) return current;
+    const error = new Error("试用已经用过。开通 Pro 即可继续使用引擎和 AI Coach。");
+    error.statusCode = 409;
+    throw error;
+  }
+  const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  return upsertSubscription(userId, {
+    plan: "trial",
+    status: "trialing",
+    source: "trial",
+    trialEndsAt,
+    currentPeriodEnd: trialEndsAt,
+  });
+}
+
 async function closePersistence() {
   try {
     if (redisClient?.isOpen) await redisClient.quit();
@@ -730,5 +848,8 @@ export {
   loadTickets,
   saveFinishedGame,
   getFinishedGame,
+  getSubscription,
+  upsertSubscription,
+  startServerTrial,
   closePersistence,
 };

@@ -5,6 +5,7 @@ import { extname, isAbsolute, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { initializeOnlineService, closeOnlineService, handleOnlineRequest, serviceInfo } from "./online-game-service.mjs";
 import { authenticateAccount, handleIdentityRequest } from "./identity-service.mjs";
+import { handleBillingRequest, userHasPro } from "./payments-service.mjs";
 
 const PORT = Number(process.env.PORT || 10000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -203,7 +204,7 @@ const server = createServer(async (request, response) => {
     response.writeHead(204, {
       "access-control-allow-origin": "*",
       "access-control-allow-methods": "GET,POST,OPTIONS",
-      "access-control-allow-headers": "content-type, authorization, x-qili-guest-token",
+      "access-control-allow-headers": "content-type, authorization, x-qili-guest-token, x-qili-study",
     });
     response.end();
     return;
@@ -215,10 +216,34 @@ const server = createServer(async (request, response) => {
       json(response, 401, { error: "请先建立棋手身份再进行整盘复盘" });
       return;
     }
+    if (!await userHasPro(account.id)) {
+      json(response, 402, { error: "整盘引擎复盘是棋理 Pro。免费仍可逐手回放棋谱。", code: "pro-required" });
+      return;
+    }
     if (!allowReviewRequest(account.id, requestIp(request))) {
       json(response, 429, { error: "复盘请求过于频繁，请稍后再试" });
       return;
     }
+  }
+
+  if (request.method === "POST" && request.url?.startsWith("/api/coach/explain")) {
+    const account = await authenticateAccount(request).catch(() => null);
+    if (!account || !await userHasPro(account.id)) {
+      json(response, 402, { error: "AI Coach 是棋理 Pro。", code: "pro-required" });
+      return;
+    }
+  }
+
+  if (request.method === "POST" && request.url?.startsWith("/api/engine/analyze") && request.headers["x-qili-study"] === "1") {
+    const account = await authenticateAccount(request).catch(() => null);
+    if (!account || !await userHasPro(account.id)) {
+      json(response, 402, { error: "引擎评估是棋理 Pro。分析页仍可摆棋走子。", code: "pro-required" });
+      return;
+    }
+  }
+
+  if (request.url?.startsWith("/api/billing/")) {
+    if (await handleBillingRequest(request, response)) return;
   }
 
   if (request.url?.startsWith("/api/engine/") || request.url?.startsWith("/api/coach/")) {

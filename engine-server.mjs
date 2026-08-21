@@ -3,7 +3,8 @@ import { spawn } from "node:child_process";
 import { coachHealth, explainCoach } from "./coach-service.mjs";
 import { recognizeBoardFromImage, recognitionHealth } from "./analysis-service.mjs";
 import { handleOnlineRequest, serviceInfo as onlineServiceInfo } from "./online-game-service.mjs";
-import { handleIdentityRequest } from "./identity-service.mjs";
+import { handleIdentityRequest, authenticateAccount } from "./identity-service.mjs";
+import { handleBillingRequest, userHasPro } from "./payments-service.mjs";
 import { RED, BLACK, OPPOSITE, createInitialBoard, applyMove, validateMove, gameStatus } from "./xiangqi-server-rules.mjs";
 
 const PORT = Number(process.env.ENGINE_PORT || 8787);
@@ -386,10 +387,14 @@ const server = createServer(async (request, response) => {
     response.writeHead(204, {
       "access-control-allow-origin": "*",
       "access-control-allow-methods": "GET,POST,OPTIONS",
-      "access-control-allow-headers": "content-type, authorization",
+      "access-control-allow-headers": "content-type, authorization, x-qili-guest-token, x-qili-study",
     });
     response.end();
     return;
+  }
+
+  if (request.url?.startsWith("/api/billing/")) {
+    if (await handleBillingRequest(request, response)) return;
   }
 
   if (request.url?.startsWith("/api/identity/") || request.url?.startsWith("/api/auth/")) {
@@ -431,6 +436,11 @@ const server = createServer(async (request, response) => {
 
   if (request.method === "POST" && request.url === "/api/coach/explain") {
     try {
+      const account = await authenticateAccount(request).catch(() => null);
+      if (!account || !(await userHasPro(account.id))) {
+        json(response, 402, { error: "AI Coach 是棋理 Pro。", code: "pro-required" });
+        return;
+      }
       const body = await readJson(request);
       const explanation = await explainCoach(body);
       json(response, 200, explanation);
@@ -444,6 +454,11 @@ const server = createServer(async (request, response) => {
 
   if (request.method === "POST" && request.url === "/api/engine/analyze-game") {
     try {
+      const account = await authenticateAccount(request).catch(() => null);
+      if (!account || !(await userHasPro(account.id))) {
+        json(response, 402, { error: "整盘引擎复盘是棋理 Pro。免费仍可逐手回放棋谱。", code: "pro-required" });
+        return;
+      }
       if (!ENGINE_PATH) {
         json(response, 503, {
           error: "Engine is not configured",
@@ -471,6 +486,13 @@ const server = createServer(async (request, response) => {
         return;
       }
 
+      if (request.headers["x-qili-study"] === "1") {
+        const account = await authenticateAccount(request).catch(() => null);
+        if (!account || !(await userHasPro(account.id))) {
+          json(response, 402, { error: "引擎评估是棋理 Pro。", code: "pro-required" });
+          return;
+        }
+      }
       const body = await readJson(request);
       if (!validateFen(body.fen)) {
         json(response, 400, { error: "Invalid xiangqi FEN" });

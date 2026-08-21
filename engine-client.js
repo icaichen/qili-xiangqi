@@ -52,11 +52,30 @@ function numericScore(line) {
   return Number(line.score.value || 0);
 }
 
+async function authHeaders(extra = {}) {
+  const headers = { "content-type": "application/json", ...extra };
+  try {
+    const token = await window.QiliIdentity?.getAuthToken?.();
+    if (token) headers.authorization = `Bearer ${token}`;
+  } catch {
+    /* guest or missing identity */
+  }
+  return headers;
+}
+
 async function fetchJson(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, options);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.error || payload.instruction || `Engine request failed (${response.status})`);
+    const error = new Error(payload.error || payload.instruction || `Engine request failed (${response.status})`);
+    error.status = response.status;
+    error.code = payload.code;
+    if (response.status === 402 || payload.code === "pro-required") {
+      window.dispatchEvent(new CustomEvent("qili-premium-required", {
+        detail: { code: payload.code || "pro-required", message: error.message, path },
+      }));
+    }
+    throw error;
   }
   return payload;
 }
@@ -65,11 +84,11 @@ async function health() {
   return fetchJson("/api/engine/health");
 }
 
-async function analyze(board, sideToMove, { depth = 10, multiPv = 3, maxTimeMs = null } = {}) {
+async function analyze(board, sideToMove, { depth = 10, multiPv = 3, maxTimeMs = null, study = false } = {}) {
   const fen = boardToFen(board, sideToMove);
   const result = await fetchJson("/api/engine/analyze", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: await authHeaders(study ? { "x-qili-study": "1" } : {}),
     body: JSON.stringify({ fen, depth, multiPv, maxTimeMs }),
   });
   return {
@@ -85,17 +104,9 @@ async function analyze(board, sideToMove, { depth = 10, multiPv = 3, maxTimeMs =
 
 async function analyzeGame(game, { depth = 7, maxPlayerMoves = 36 } = {}) {
   if (!game || !Array.isArray(game.moves) || !game.moves.length) throw new Error("这盘棋没有可复盘的着法");
-  let token = null;
-  try {
-    token = await window.QiliIdentity?.getAuthToken?.();
-  } catch {
-    token = null;
-  }
-  const headers = { "content-type": "application/json" };
-  if (token) headers.authorization = `Bearer ${token}`;
   return fetchJson("/api/engine/analyze-game", {
     method: "POST",
-    headers,
+    headers: await authHeaders(),
     body: JSON.stringify({
       moves: game.moves,
       playerColor: game.color,
@@ -108,7 +119,7 @@ async function analyzeGame(game, { depth = 7, maxPlayerMoves = 36 } = {}) {
 async function explainCoach(coachCase) {
   return fetchJson("/api/coach/explain", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify(coachCase),
   });
 }

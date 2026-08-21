@@ -272,8 +272,12 @@ if (root) {
 
     const lines = analysis?.lines || [];
     const tools = window.QiliReviewCoach;
+    const engineLocked = Boolean(analysis?.locked || (window.QiliPremium && !window.QiliPremium.can("engine")));
+    const coachLocked = Boolean(window.QiliPremium && !window.QiliPremium.can("coach"));
     let coachHtml;
-    if (analysis?.error && !coachAnalysis) {
+    if (engineLocked || coachLocked) {
+      coachHtml = window.QiliPremium?.lockedCardHtml?.(engineLocked ? "engine" : "coach") || `<article class="coach-empty"><h3>引擎评估是 Pro</h3><p>可以继续摆棋、走子。评估条和讲解需要开通棋理 Pro。</p></article>`;
+    } else if (analysis?.error && !coachAnalysis) {
       coachHtml = `<article class="coach-empty"><h3>还不能分析</h3><p>${escapeHtml(analysis.error)}</p></article>`;
     } else if (coachAnalysis?.pending) {
       coachHtml = `<article class="coach-card move-summary-card">
@@ -300,7 +304,7 @@ if (root) {
           </ul>
         </article>`;
     }
-    if (!editing && !replay && lines.length) {
+    if (!editing && !replay && lines.length && !engineLocked) {
       coachHtml += `<div class="candidate-list">
         ${lines.map((line, index) => `
           <button type="button" class="candidate-row${index === selectedLine ? " active" : ""}" data-candidate="${index}">
@@ -396,17 +400,17 @@ if (root) {
             <strong>${sideToMove === "red" ? "轮到红方" : "轮到黑方"}</strong>
           </div>
           <div class="evaluation-pill">
-            <span>${analyzing ? "计算中" : evalLabel(scoreCp)}</span>
-            <strong>${analyzing ? "…" : escapeHtml(formatScore(scoreCp))}</strong>
+            <span>${engineLocked ? "局势" : analyzing ? "计算中" : evalLabel(scoreCp)}</span>
+            <strong>${engineLocked ? "Pro" : analyzing ? "…" : escapeHtml(formatScore(scoreCp))}</strong>
           </div>
         </div>
 
         <div class="board-area">
           <div class="analysis-board-cluster">
-            <div class="analysis-eval-bar ${redAhead ? "red-ahead" : "black-ahead"}" aria-label="评估条">
+            ${engineLocked ? "" : `<div class="analysis-eval-bar ${redAhead ? "red-ahead" : "black-ahead"}" aria-label="评估条">
               <i style="height:${topPct}%"></i>
               <span>${analyzing ? "…" : escapeHtml(formatScore(scoreCp))}</span>
-            </div>
+            </div>`}
             <div class="xiangqi-board" aria-label="分析棋盘">
               <svg class="board-lines" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true">
                 <g class="grid-lines">
@@ -668,6 +672,11 @@ if (root) {
   }
 
   async function runCoach(sourceBoard, move) {
+    if (window.QiliPremium && !window.QiliPremium.can("coach")) {
+      coachAnalysis = null;
+      render();
+      return;
+    }
     const tools = window.QiliReviewCoach;
     const requestId = ++coachRequestId;
     coachAnalysis = { pending: true, moveNotation: formatMove(move, sourceBoard) };
@@ -699,7 +708,12 @@ if (root) {
       render();
     } catch (error) {
       if (requestId !== coachRequestId) return;
-      coachAnalysis = { error: error instanceof Error ? error.message : "讲解失败" };
+      if (error?.status === 402 || error?.code === "pro-required") {
+        coachAnalysis = null;
+        window.QiliPremium?.open?.("coach");
+      } else {
+        coachAnalysis = { error: error instanceof Error ? error.message : "讲解失败" };
+      }
       render();
     }
   }
@@ -805,6 +819,13 @@ if (root) {
   }
 
   async function runAnalysis() {
+    if (window.QiliPremium && !window.QiliPremium.can("engine")) {
+      analysis = { locked: true };
+      hintMove = null;
+      analyzing = false;
+      render();
+      return;
+    }
     const generals = countGenerals(board);
     if (generals.red !== 1 || generals.black !== 1) {
       analysis = { error: "棋盘上必须各有一枚帅和将。" };
@@ -822,7 +843,7 @@ if (root) {
     selectedLine = 0;
     render();
     try {
-      const result = await engine.analyze(board, sideToMove, { depth: 12, multiPv: 3 });
+      const result = await engine.analyze(board, sideToMove, { depth: 12, multiPv: 3, study: true });
       if (current !== requestId) return;
       const lines = (result.lines || []).filter((line) => line.parsedMove).map((line) => ({
         move: line.parsedMove,
@@ -836,7 +857,12 @@ if (root) {
       selectedLine = 0;
     } catch (error) {
       if (current !== requestId) return;
-      analysis = { error: error instanceof Error ? error.message : "分析失败" };
+      if (error?.status === 402 || error?.code === "pro-required") {
+        analysis = { locked: true };
+        window.QiliPremium?.open?.("engine");
+      } else {
+        analysis = { error: error instanceof Error ? error.message : "分析失败" };
+      }
     } finally {
       if (current === requestId) analyzing = false;
       render();

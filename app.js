@@ -491,6 +491,7 @@ function renderMoveHints() {
   if (!moveHintsElement || !moveHintLegendElement) return;
   const visible = Boolean(
     !boardReplay &&
+    window.QiliPremium?.can("engine") !== false &&
     moveHintsToggleElement?.checked &&
     currentTurn === COLORS.RED &&
     !locked &&
@@ -565,6 +566,7 @@ async function refreshMoveSuggestions() {
     const analysis = await engineClient.analyze(board, COLORS.RED, {
       depth: Math.max(8, Math.min(13, settings.depth)),
       multiPv: 3,
+      study: true,
     });
     if (requestId !== suggestionRequestId || locked || currentTurn !== COLORS.RED || gameOver) return;
     moveSuggestions = analysis.lines
@@ -579,6 +581,12 @@ async function refreshMoveSuggestions() {
     if (requestId !== suggestionRequestId) return;
     moveSuggestions = [];
     renderMoveHints();
+    if (error?.status === 402 || error?.code === "pro-required") {
+      if (moveHintsToggleElement) moveHintsToggleElement.checked = false;
+      window.QiliPremium?.require?.("engine");
+      engineStateElement.textContent = "候选着是棋理 Pro";
+      return;
+    }
     engineStateElement.textContent = "候选箭头暂时不可用";
   }
 }
@@ -831,12 +839,13 @@ function performMove(move, color) {
 }
 
 async function analyzeHumanMoveInBackground(sourceBoard, afterHumanBoard, move) {
+  if (!window.QiliPremium?.can("coach")) return;
   if (!analysisToggleElement?.checked || !engineConnected || gameOver) return;
   try {
     const settings = engineSettings();
     const coachDepth = Math.max(8, Math.min(14, settings.depth));
-    const before = await engineClient.analyze(sourceBoard, COLORS.RED, { depth: coachDepth, multiPv: 4, maxTimeMs: 500 });
-    const after = await engineClient.analyze(afterHumanBoard, COLORS.BLACK, { depth: coachDepth, multiPv: 2, maxTimeMs: 350 });
+    const before = await engineClient.analyze(sourceBoard, COLORS.RED, { depth: coachDepth, multiPv: 4, maxTimeMs: 500, study: true });
+    const after = await engineClient.analyze(afterHumanBoard, COLORS.BLACK, { depth: coachDepth, multiPv: 2, maxTimeMs: 350, study: true });
     coachAnalysis = buildCoachAnalysis(sourceBoard, move, before, after);
     coachAnalysis.ply = history.length;
     coachAnalysis.source = "play";
@@ -1165,9 +1174,9 @@ async function analyzeMoveEngine(sourceBoard, move, options = {}) {
   if (!mover) throw new Error("无法读取这一步的起始棋盘");
   const depth = Math.max(8, Math.min(16, Number(options.depth) || 12));
   const routeLimit = Math.max(6, Math.min(12, Number(options.routeLimit) || 10));
-  const before = await engineClient.analyze(sourceBoard, mover.color, { depth, multiPv: 8 });
+  const before = await engineClient.analyze(sourceBoard, mover.color, { depth, multiPv: 8, study: true });
   const afterBoard = applyMove(sourceBoard, move).board;
-  const after = await engineClient.analyze(afterBoard, OPPOSITE[mover.color], { depth, multiPv: 3 });
+  const after = await engineClient.analyze(afterBoard, OPPOSITE[mover.color], { depth, multiPv: 3, study: true });
   return buildCoachAnalysis(sourceBoard, move, before, after, { routeLimit });
 }
 
@@ -1347,6 +1356,10 @@ function analysisOffCardHtml() {
   return '<article class="coach-empty"><h3>独立思考模式</h3><p>打开「棋理分析」后，每一步都会得到简短解释。</p></article>';
 }
 
+function premiumCoachHtml() {
+  return window.QiliPremium?.lockedCardHtml?.("coach") || '<article class="coach-empty"><h3>AI Coach 是 Pro</h3><p>下棋免费。讲解需要开通棋理 Pro。</p></article>';
+}
+
 function emptyCoachHtml() {
   return '<article class="coach-empty"><h3>等待你的下一步</h3><p>每一步都会获得：</p><ul><li>为什么</li><li>更好的选择</li><li>棋理建议</li></ul></article>';
 }
@@ -1364,6 +1377,13 @@ function setCoachHtml(html) {
 }
 
 function renderCoach() {
+  if (!window.QiliPremium?.can("coach")) {
+    closeBoardReplay();
+    if (analysisToggleElement) analysisToggleElement.checked = false;
+    if (moveHintsToggleElement) moveHintsToggleElement.checked = false;
+    setCoachHtml(premiumCoachHtml());
+    return;
+  }
   if (!analysisToggleElement.checked) {
     closeBoardReplay();
     setCoachHtml(analysisOffCardHtml());
@@ -1682,7 +1702,15 @@ reviewFinishedGameButtonElement?.addEventListener("click", () => {
 });
 rematchButtonElement?.addEventListener("click", resetGame);
 dismissGameResultButtonElement?.addEventListener("click", hideGameResult);
-analysisToggleElement?.addEventListener("change", renderCoach);
+analysisToggleElement?.addEventListener("change", () => {
+  if (analysisToggleElement.checked && !window.QiliPremium?.can("coach")) {
+    analysisToggleElement.checked = false;
+    window.QiliPremium?.require("coach");
+    renderCoach();
+    return;
+  }
+  renderCoach();
+});
 function renderNotationLesson(notation = "车二进四", pieceType = "rook", color = "red") {
   if (!notationBreakdownElement) return;
   const chars = [...notation];
@@ -1742,11 +1770,22 @@ document.querySelectorAll(".notation-example").forEach((button) => {
 });
 
 moveHintsToggleElement?.addEventListener("change", () => {
+  if (moveHintsToggleElement.checked && !window.QiliPremium?.can("engine")) {
+    moveHintsToggleElement.checked = false;
+    window.QiliPremium?.require("engine");
+    clearMoveSuggestions();
+    return;
+  }
   if (moveHintsToggleElement.checked) refreshMoveSuggestions();
   else clearMoveSuggestions();
 });
 levelSelectElement?.addEventListener("change", () => {
   if (currentTurn === COLORS.RED && !locked) refreshMoveSuggestions();
+});
+
+window.addEventListener("qili-premium-change", () => {
+  renderCoach();
+  renderMoveHints();
 });
 
 function switchPlatformView(viewName) {

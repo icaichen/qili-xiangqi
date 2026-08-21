@@ -31,8 +31,143 @@
     <link rel="stylesheet" href="/analysis.css" />
     <link rel="stylesheet" href="/play-layout-v2.css" />
     <link rel="stylesheet" href="/learn.css" />
+    <link rel="stylesheet" href="/landing.css" />
   </head>
-  <body>
+  <body class="auth-pending">
+    <div id="landingPage" class="landing-page" hidden>
+      <header class="landing-nav" aria-label="首页导航">
+        <a class="landing-brand" href="#landingTop" aria-label="棋理首页">
+          <span class="landing-brand-mark">帅</span>
+          <span class="landing-brand-copy"><strong>棋理</strong><small>QILI XIANGQI</small></span>
+        </a>
+        <div class="landing-nav-actions">
+          <a href="#landingFeatures">看看能做什么</a>
+          <button class="landing-login" type="button" data-landing-action="signin">登录</button>
+        </div>
+      </header>
+
+      <main id="landingTop">
+        <section class="landing-hero" aria-labelledby="landingTitle">
+          <div class="landing-hero-copy">
+            <div class="landing-kicker"><span>●</span> 在线中国象棋 · AI 复盘与训练</div>
+            <h1 id="landingTitle">下完这一盘，<br><em>真的变强一点。</em></h1>
+            <p class="landing-lede">和真人或电脑下棋。AI 帮你看懂关键一手，再把问题变成下一课。</p>
+            <div class="landing-actions">
+              <button class="landing-cta landing-cta-primary" type="button" data-landing-action="signin">
+                <span>免费开始</span><i aria-hidden="true">→</i>
+              </button>
+              <button class="landing-cta landing-cta-secondary" type="button" data-landing-action="guest">
+                先体验人机对局
+              </button>
+            </div>
+            <p class="landing-no-card">无需付费 · 游客也能玩 · 支持手机与电脑</p>
+          </div>
+
+          <div class="landing-game-scene" aria-label="棋理对局与 AI 复盘示例">
+            <div class="landing-float-badge landing-badge-rating"><span>棋力更新</span><strong>Qili 1526 <i>+12</i></strong></div>
+            <div class="landing-float-badge landing-badge-lesson"><i>练</i><span>下一课</span><strong>底线安全</strong></div>
+            <div class="landing-game-window">
+              <div class="landing-game-bar">
+                <div class="landing-game-brand"><span>帅</span><b>棋理对局</b></div>
+                <div class="landing-game-status"><i></i> 对局已结束</div>
+                <button type="button" tabindex="-1">复盘模式</button>
+              </div>
+              <div class="landing-game-body">
+                <div class="landing-player-rail">
+                  <div class="landing-player"><span class="landing-avatar red">你</span><div><b>你</b><small>Qili 1514</small></div><strong>08:42</strong></div>
+                  <div class="landing-board-shell">
+                    <div id="landingBoard" class="landing-board" aria-label="中国象棋复盘局面"></div>
+                    <div class="landing-last-move" aria-hidden="true"></div>
+                    <span class="landing-board-label landing-board-label-left">楚 河</span>
+                    <span class="landing-board-label landing-board-label-right">汉 界</span>
+                  </div>
+                  <div class="landing-player"><span class="landing-avatar black">海</span><div><b>山海一棋</b><small>Qili 1541</small></div><strong>06:18</strong></div>
+                </div>
+                <aside class="landing-review-panel">
+                  <div class="landing-review-head"><span><i>AI</i> 本局复盘</span><b>完成</b></div>
+                  <div class="landing-review-score"><small>本局表现</small><strong>82</strong><span>/ 100</span><em>状态不错</em></div>
+                  <div class="landing-review-timeline"><button type="button"><i class="good">妙</i><span><b>第 11 回合</b><small>漂亮的先手</small></span></button><button class="active" type="button"><i class="bad">?</i><span><b>第 23 回合</b><small>关键转折</small></span></button><button type="button"><i>✓</i><span><b>第 31 回合</b><small>稳健防守</small></span></button></div>
+                  <article class="landing-coach-card"><span class="landing-coach-avatar">理</span><div><small>AI COACH</small><strong>先看将帅安全，再算能不能吃子。</strong><p>这里不是车的问题。你的底线只有一个安全格，应该先补士。</p></div></article>
+                  <button class="landing-review-button" type="button" tabindex="-1">练习这个局面 <span>→</span></button>
+                </aside>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="landing-trust" aria-label="棋理核心能力">
+          <p>为中国象棋玩家做的新主场</p>
+          <div><span><i>⚔</i><b>真人在线</b><small>快速匹配与私人房间</small></span><span><i>鱼</i><b>Pikafish</b><small>真实引擎验证每一步</small></span><span><i>理</i><b>AI 教练</b><small>说人话，不堆引擎术语</small></span></div>
+        </section>
+
+        <section class="landing-time-modes" aria-labelledby="landingTimeTitle">
+          <div class="landing-time-head">
+            <div><span>PLAY YOUR PACE</span><h2 id="landingTimeTitle">中国象棋，<br>也可以只花一分钟。</h2></div>
+            <p>从一触即发的 1+0，到能认真算变化的 15+10。不同时间制分别进入超快棋、快棋和中局 Qili 分池。</p>
+          </div>
+          <div class="landing-time-grid">
+            <article class="landing-time-card landing-time-bullet">
+              <div class="landing-time-card-head"><span><i>⚡</i> 超快棋</span><small>BULLET</small></div>
+              <strong>1:00</strong>
+              <h3>一秒都不能浪费</h3>
+              <p>整盘只有一分钟。凭直觉、棋感和手速，在压力里找到唯一的路。</p>
+              <div class="landing-time-options"><button type="button" data-landing-action="mode" data-time-control="60+0"><b>1+0</b><small>1 分钟</small></button><button type="button" data-landing-action="mode" data-time-control="120+1"><b>2+1</b><small>每步 +1 秒</small></button></div>
+            </article>
+            <article class="landing-time-card landing-time-blitz">
+              <div class="landing-time-card-head"><span><i>◆</i> 快棋</span><small>BLITZ</small></div>
+              <strong>3+2</strong>
+              <h3>快，但不能乱</h3>
+              <p>三分钟起步，每走一步加两秒。敢进攻，也要留得住思考时间。</p>
+              <div class="landing-time-options"><button class="featured" type="button" data-landing-action="mode" data-time-control="180+2"><b>3+2</b><small>每步 +2 秒</small></button><button type="button" data-landing-action="mode" data-time-control="300+0"><b>5+0</b><small>5 分钟</small></button><button type="button" data-landing-action="mode" data-time-control="300+3"><b>5+3</b><small>每步 +3 秒</small></button></div>
+            </article>
+            <article class="landing-time-card landing-time-rapid">
+              <div class="landing-time-card-head"><span><i>◷</i> 中局 / 慢棋</span><small>RAPID</small></div>
+              <strong>10:00</strong>
+              <h3>给好棋多一点时间</h3>
+              <p>完整布局、认真计算，再让复盘把整盘棋讲清楚。</p>
+              <div class="landing-time-options"><button type="button" data-landing-action="mode" data-time-control="600+0"><b>10+0</b><small>10 分钟</small></button><button type="button" data-landing-action="mode" data-time-control="600+5"><b>10+5</b><small>每步 +5 秒</small></button><button type="button" data-landing-action="mode" data-time-control="900+10"><b>15+10</b><small>认真下一盘</small></button></div>
+            </article>
+          </div>
+          <p class="landing-time-note"><span></span> 点击任意时间制，进入真人匹配大厅并自动选好时钟</p>
+        </section>
+
+        <section id="landingFeatures" class="landing-features" aria-labelledby="landingFeaturesTitle">
+          <div class="landing-features-head">
+            <span>一盘棋之后</span>
+            <h2 id="landingFeaturesTitle">不只知道输赢。<br>还知道怎么赢回来。</h2>
+          </div>
+          <div class="landing-feature-grid">
+            <article class="landing-feature-card landing-feature-play"><span>PLAY</span><h3>想下就下</h3><p>真人快速匹配、好友房间、不同棋力的人机对战。两分钟也能认真来一盘。</p><div class="landing-mini-match"><div><i>你</i><span><b>正在匹配</b><small>3+2 · 快棋</small></span></div><strong>00:03</strong></div></article>
+            <article class="landing-feature-card landing-feature-review"><span>REVIEW</span><h3>看懂关键一手</h3><p>不把一堆变化扔给你。AI 教练用一句能记住的话，讲清楚局面为什么变了。</p><div class="landing-chat"><i>理</i><p>这步看起来在进攻，其实让自己的将没有退路。</p></div></article>
+            <article class="landing-feature-card landing-feature-grow"><span>IMPROVE</span><h3>下一课只练弱点</h3><p>每一盘都会更新能力画像。刚暴露的漏洞，就是你最该练的下一课。</p><div class="landing-skill-bars"><span><b>保护意识</b><i><em style="width:78%"></em></i></span><span><b>交换判断</b><i><em style="width:61%"></em></i></span><span><b>底线安全</b><i><em style="width:36%"></em></i></span></div></article>
+          </div>
+        </section>
+
+        <section class="landing-community" aria-labelledby="landingCommunityTitle">
+          <div class="landing-community-head"><div><span>PLAYER VOICES</span><h2 id="landingCommunityTitle">如果棋手会说真话。</h2></div><p>体验反馈示例</p></div>
+          <div class="landing-comment-stack">
+            <article class="landing-comment-card"><div class="landing-comment-user"><span class="avatar-red">北</span><div><b>北望长安</b><small>快棋玩家 · 示例昵称</small></div><i>★★★★★</i></div><blockquote>“终于有人把复盘讲成人话了。以前我只看哪里掉了子，现在知道自己当时漏想了什么。”</blockquote><div class="landing-comment-tags"><span>AI 复盘</span><span>3+2 快棋</span></div></article>
+            <article class="landing-comment-card featured"><div class="landing-comment-user"><span class="avatar-yellow">炮</span><div><b>老张的炮</b><small>超快棋玩家 · 示例昵称</small></div><i>★★★★★</i></div><blockquote>“1 分钟局真的上头。午休不用凑出半小时，也能完整下一盘有输赢的棋。”</blockquote><div class="landing-comment-tags"><span>1+0 超快棋</span><span>真人匹配</span></div></article>
+            <article class="landing-comment-card"><div class="landing-comment-user"><span class="avatar-green">河</span><div><b>河界以南</b><small>学习型玩家 · 示例昵称</small></div><i>★★★★★</i></div><blockquote>“3+2 刚刚好：够我认真算，又不会拖太久。下完直接知道下一课练什么。”</blockquote><div class="landing-comment-tags"><span>个性训练</span><span>能力画像</span></div></article>
+          </div>
+          <p class="landing-community-disclosure">以上为产品体验场景的示例文案，不代表真实用户背书；积累真实反馈后可原位替换。</p>
+          <div class="landing-achievements" aria-hidden="true"><i>妙</i><i>稳</i><i>升</i>
+          </div>
+        </section>
+
+        <section class="landing-final-cta">
+          <div class="landing-final-pieces" aria-hidden="true"><i>车</i><i>马</i><i>炮</i></div>
+          <span>轮到你了</span>
+          <h2>开一盘。<br>看懂一盘。</h2>
+          <p>免费开始你的棋力成长。</p>
+          <button class="landing-cta landing-cta-inverse" type="button" data-landing-action="signin"><span>立即开始</span><i aria-hidden="true">→</i></button>
+        </section>
+      </main>
+
+      <footer class="landing-footer"><div class="landing-brand"><span class="landing-brand-mark">帅</span><span class="landing-brand-copy"><strong>棋理</strong><small>QILI XIANGQI</small></span></div><p>在线对弈 · AI 复盘 · 个性训练</p><span>© 2026 棋理 Qili</span></footer>
+      <div id="landingToast" class="landing-toast" role="status" aria-live="polite"></div>
+    </div>
+
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
@@ -527,6 +662,7 @@
           <article class="platform-surface profile-stat rating-stat"><span>Blitz · Qili</span><strong id="profileBlitzRating">1500</strong><small id="profileBlitzMeta">Qili 初始 1500 · 定级中 · 3–5 分钟</small></article>
           <article class="platform-surface profile-stat rating-stat"><span>Bullet · Qili</span><strong id="profileBulletRating">1500</strong><small id="profileBulletMeta">Qili 初始 1500 · 定级中 · 1–2 分钟</small></article>
           <article class="platform-surface profile-stat"><span>完成对局</span><strong id="profileGameCount">0</strong><small>电脑局与真人对局</small></article>
+          <article class="platform-surface premium-card" id="profilePremiumCard"></article>
           <article class="platform-surface ability-card" id="profileAbilityCard"><div><span class="eyebrow">能力画像</span><h2>不是一个总分，而是六项能力</h2></div><div class="ability-empty"><span>将军识别</span><span>吃子判断</span><span>保护意识</span><span>交换判断</span><span>战术配合</span><span>开局出子</span></div><p>下过棋、出现过将军/吃子/悬子以后才会打分。不编百分比。</p></article>
           <article class="platform-surface recent-games-card profile-history-card">
             <div class="profile-history-head"><div><span class="eyebrow">最近对局</span><h2>历史棋局</h2></div><button class="button button-ghost platform-jump" data-target-view="online">再下一盘</button></div>
@@ -596,6 +732,8 @@
 
     <script type="module">
       const bootSteps = [
+        ["auth-client", () => import("/auth-client.js")],
+        ["landing", () => import("/landing.js")],
         ["engine-client", () => import("/engine-client.js")],
         ["coach-tools", () => import("/coach-tools.js")],
         ["app", () => import("/app.js")],
@@ -604,8 +742,8 @@
         ["learn-client", () => import("/learn-client.js")],
         ["ability-client", () => import("/ability-client.js")],
         ["kids-client", () => import("/kids-client.js")],
-        ["auth-client", () => import("/auth-client.js")],
         ["identity-client", () => import("/identity-client.js")],
+        ["premium-client", () => import("/premium-client.js")],
         ["online-client", () => import("/online-client.js")],
       ];
 
