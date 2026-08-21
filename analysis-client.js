@@ -681,6 +681,8 @@ if (root) {
       const built = await tools.analyzeMove(sourceBoard, move, { depth: 12, routeLimit: 8 });
       if (requestId !== coachRequestId) return;
       built.aiCoach = { state: "loading" };
+      built.ply = cursor;
+      built.source = "analysis";
       coachAnalysis = built;
       window.QiliLearn?.ingestAnalysis?.(built);
       render();

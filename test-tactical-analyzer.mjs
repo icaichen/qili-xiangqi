@@ -1,6 +1,6 @@
 import { analyzeMove } from "./tactical-analyzer.js";
 
-const values = { general: 10000, rook: 900, cannon: 450, horse: 420, elephant: 220, advisor: 220, pawn: 100 };
+const values = { general: 10000, rook: 900, cannon: 450, horse: 400, elephant: 220, advisor: 220, pawn: 100 };
 const opposite = { red: "black", black: "red" };
 const labels = {
   red: { general: "帅", rook: "车", cannon: "炮", horse: "马", elephant: "相", advisor: "仕", pawn: "兵" },

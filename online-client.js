@@ -1,4 +1,5 @@
 import { legalMovesForPiece } from "/xiangqi-server-rules.mjs";
+import { TIME_CONTROL_CATALOG, timeControlSelectHtml } from "/time-controls.mjs";
 
 const isLocalDev = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const API = window.__QILI_ONLINE_API__ || (isLocalDev ? "http://127.0.0.1:8787" : window.location.origin);
@@ -111,6 +112,11 @@ function setMatching(active) {
 }
 
 function timeLabel(tc = room?.timeControl) {
+  const matched = TIME_CONTROL_CATALOG.find((item) => (
+    item.baseSeconds === Number(tc?.baseSeconds) &&
+    item.incrementSeconds === Number(tc?.incrementSeconds)
+  ));
+  if (matched) return matched.label;
   const base = Math.round(Number(tc?.baseSeconds || 600) / 60);
   const inc = Number(tc?.incrementSeconds || 0);
   return `${base} + ${inc}`;
@@ -318,12 +324,9 @@ function connectStream() {
 }
 
 async function adoptSession(roomId, playerToken, color, initialRoom = null) {
-  saveSession({ roomId, playerToken, color });
-  if (initialRoom) updateRoom(initialRoom);
-  else {
-    const payload = await request(`/api/online/rooms/${roomId}?token=${encodeURIComponent(playerToken)}`);
-    updateRoom(payload.room);
-  }
+  const roomState = initialRoom || (await request(`/api/online/rooms/${roomId}?token=${encodeURIComponent(playerToken)}`)).room;
+  saveSession({ roomId, playerToken, color: roomState?.viewerColor || color });
+  updateRoom(roomState);
   connectStream();
 }
 
@@ -523,5 +526,6 @@ document.querySelector("#onlineReturnLobby")?.addEventListener("click", leaveRoo
 document.querySelector("#onlineResultLobby")?.addEventListener("click", leaveRoom);
 document.querySelector("#onlineResultDismiss")?.addEventListener("click", () => resultOverlay?.classList.add("hidden"));
 
+if (timeSelect) timeSelect.innerHTML = timeControlSelectHtml(timeSelect.value || "600+0");
 showLobby();
 checkOnlineApi();

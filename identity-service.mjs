@@ -9,6 +9,7 @@ import {
   getRatingsForUser,
   getComputerRatings,
   recordComputerCalibration,
+  saveComputerGame,
   listGamesForUser,
   initializePersistence,
   persistenceInfo,
@@ -186,11 +187,17 @@ async function handleIdentityRequest(request, response) {
     if (request.method === "POST" && url.pathname === "/api/identity/me/computer-result") {
       const user = await requireAccount(request);
       const body = await readJson(request);
-      const gameId = String(body.gameId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100);
-      const level = String(body.level || "").slice(0, 12);
-      const winner = body.winner == null ? null : String(body.winner);
+      const gameId = String(body.gameId || body.game?.id || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100);
+      const level = String(body.level || body.game?.timeControl?.level || "").slice(0, 12);
+      const rawWinner = body.winner ?? body.game?.result?.winner;
+      const winner = rawWinner == null ? null : String(rawWinner);
       if (!gameId || !["red", "black", null].includes(winner)) {
         throw Object.assign(new Error("Invalid computer game result"), { statusCode: 400 });
+      }
+      if (body.game?.moves) {
+        await saveComputerGame(user.id, { ...body.game, id: gameId }).catch((error) => {
+          console.warn("[computer-game-save]", error);
+        });
       }
       const calibration = await recordComputerCalibration({ gameId, userId: user.id, level, winner });
       json(response, 200, { calibration, levels: await getComputerRatings() });

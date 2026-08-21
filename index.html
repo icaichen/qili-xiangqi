@@ -3,8 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="棋理：在线中国象棋平台。下棋、训练、学习、复盘与棋力成长。" />
-    <title>棋理 · 在线中国象棋</title>
+    <title>棋理 Qili · 在线中国象棋</title>
+    <meta name="description" content="棋理是在线中国象棋平台：和真人下棋、挑战电脑、复盘、学习棋理。红先黑后，支持快棋、超快棋与中局。" />
+    <meta name="theme-color" content="#ed482f" />
+    <link rel="canonical" href="https://qilichess.com/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:site_name" content="棋理 Qili" />
+    <meta property="og:title" content="棋理 Qili · 在线中国象棋" />
+    <meta property="og:description" content="和真人下棋、挑战电脑、复盘和学习。不是背最佳着，而是看懂每一步。" />
+    <meta property="og:url" content="https://qilichess.com/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="棋理 Qili · 在线中国象棋" />
+    <meta name="twitter:description" content="和真人下棋、挑战电脑、复盘和学习。" />
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"WebApplication","name":"棋理 Qili","url":"https://qilichess.com/","applicationCategory":"GameApplication","inLanguage":"zh-CN","description":"在线中国象棋：对弈、复盘、学习与棋力成长。","offers":{"@type":"Offer","price":"0","priceCurrency":"CNY"}}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800;900&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet" />
@@ -55,7 +70,7 @@
             <article class="home-action-card"><b>盘</b><span class="eyebrow">复盘</span><h2>看懂自己的棋</h2><p>用真实对局找到关键失误，而不是刷一本无关的课程。</p><button class="button button-ghost platform-jump" data-target-view="review">去复盘</button></article>
           </section>
           <section class="home-lower-grid">
-            <article class="platform-surface home-status-card"><span class="eyebrow">你的成长</span><h2>能力画像</h2><p>吃子判断 · 将军识别 · 保护意识 · 交换判断</p><small>完成足够对局后才显示真实能力数据。</small></article>
+            <article class="platform-surface home-status-card" id="homeAbilityCard"><span class="eyebrow">你的成长</span><h2>能力画像</h2><p>将军识别 · 吃子判断 · 保护意识 · 交换判断 · 战术配合 · 开局出子</p><small>完成足够对局后才显示真实能力数据。</small></article>
             <article class="platform-surface home-status-card"><span class="eyebrow">平台状态</span><h2>当前可用</h2><p>✓ 真人快速匹配<br>✓ 私人房间对弈<br>✓ 学习中心（可练习课）<br>✓ 本地 Pikafish 人机对弈</p></article>
           </section>
         </div>
@@ -284,9 +299,22 @@
               <label class="online-field">
                 <span>时间制</span>
                 <select id="onlineTimeControl">
-                  <option value="600+0">10 + 0 · 快棋</option>
-                  <option value="600+5">10 + 5 · 加秒</option>
-                  <option value="300+3">5 + 3 · 快速</option>
+                  <optgroup label="超快棋">
+                    <option value="60+0">1+0 · 超快棋</option>
+                    <option value="120+1">2+1 · 超快棋</option>
+                  </optgroup>
+                  <optgroup label="快棋">
+                    <option value="180+2">3+2 · 快棋</option>
+                    <option value="300+0">5+0 · 快棋</option>
+                    <option value="300+3">5+3 · 快棋</option>
+                  </optgroup>
+                  <optgroup label="中局">
+                    <option value="600+0" selected>10+0 · 中局</option>
+                    <option value="600+5">10+5 · 中局</option>
+                  </optgroup>
+                  <optgroup label="慢棋">
+                    <option value="900+10">15+10 · 慢棋</option>
+                  </optgroup>
                 </select>
               </label>
               <div class="online-primary-actions">
@@ -476,7 +504,7 @@
       </section>
       <section id="analysisView" class="workspace platform-view play-workspace hidden"></section>
       <section id="profileView" class="platform-view platform-page hidden">
-        <div class="platform-page-header"><div><span class="eyebrow">PROFILE · 我的</span><h1>你的棋手档案</h1><p>游客可以直接下棋；登录后，历史棋局与 Rapid / Blitz Rating 可以在其他设备恢复。</p></div><span id="profileAccountStatus">正在建立棋手身份…</span></div>
+        <div class="platform-page-header"><div><span class="eyebrow">PROFILE · 我的</span><h1>你的棋手档案</h1><p>游客可以直接下棋；登录后，历史棋局与 Rapid / Blitz / Bullet 可以在其他设备恢复。</p></div><span id="profileAccountStatus">正在建立棋手身份…</span></div>
         <div class="profile-grid">
           <article class="platform-surface profile-identity">
             <div class="profile-avatar">帅</div>
@@ -495,12 +523,13 @@
               <small id="profileAuthStatus">正在检查登录服务…</small>
             </div>
           </article>
-          <article class="platform-surface profile-stat rating-stat"><span>Rapid · Qili</span><strong id="profileRapidRating">1500</strong><small id="profileRapidMeta">Qili 初始 1500 · 定级中</small></article>
-          <article class="platform-surface profile-stat rating-stat"><span>Blitz · Qili</span><strong id="profileBlitzRating">1500</strong><small id="profileBlitzMeta">Qili 初始 1500 · 定级中</small></article>
-          <article class="platform-surface profile-stat"><span>完成真人对局</span><strong id="profileGameCount">0</strong><small>来自永久棋谱数据库</small></article>
-          <article class="platform-surface ability-card"><div><span class="eyebrow">能力画像</span><h2>不是一个总分，而是六项能力</h2></div><div class="ability-empty"><span>将军识别</span><span>吃子判断</span><span>保护意识</span><span>交换判断</span><span>杀法计算</span><span>布局基础</span></div><p>有足够真实对局后才显示能力百分比，不使用虚构数据。</p></article>
+          <article class="platform-surface profile-stat rating-stat"><span>Rapid · Qili</span><strong id="profileRapidRating">1500</strong><small id="profileRapidMeta">Qili 初始 1500 · 定级中 · 10 分钟及以上</small></article>
+          <article class="platform-surface profile-stat rating-stat"><span>Blitz · Qili</span><strong id="profileBlitzRating">1500</strong><small id="profileBlitzMeta">Qili 初始 1500 · 定级中 · 3–5 分钟</small></article>
+          <article class="platform-surface profile-stat rating-stat"><span>Bullet · Qili</span><strong id="profileBulletRating">1500</strong><small id="profileBulletMeta">Qili 初始 1500 · 定级中 · 1–2 分钟</small></article>
+          <article class="platform-surface profile-stat"><span>完成对局</span><strong id="profileGameCount">0</strong><small>电脑局与真人对局</small></article>
+          <article class="platform-surface ability-card" id="profileAbilityCard"><div><span class="eyebrow">能力画像</span><h2>不是一个总分，而是六项能力</h2></div><div class="ability-empty"><span>将军识别</span><span>吃子判断</span><span>保护意识</span><span>交换判断</span><span>战术配合</span><span>开局出子</span></div><p>下过棋、出现过将军/吃子/悬子以后才会打分。不编百分比。</p></article>
           <article class="platform-surface recent-games-card profile-history-card">
-            <div class="profile-history-head"><div><span class="eyebrow">最近对局</span><h2>真人历史棋局</h2></div><button class="button button-ghost platform-jump" data-target-view="online">再下一盘</button></div>
+            <div class="profile-history-head"><div><span class="eyebrow">最近对局</span><h2>历史棋局</h2></div><button class="button button-ghost platform-jump" data-target-view="online">再下一盘</button></div>
             <div id="profileRecentGames" class="profile-history-list"><div class="profile-history-empty"><strong>正在读取历史棋局…</strong></div></div>
           </article>
         </div>
@@ -573,6 +602,7 @@
         ["analysis-client", () => import("/analysis-client.js")],
         ["tutorial-client", () => import("/tutorial-client.js")],
         ["learn-client", () => import("/learn-client.js")],
+        ["ability-client", () => import("/ability-client.js")],
         ["kids-client", () => import("/kids-client.js")],
         ["auth-client", () => import("/auth-client.js")],
         ["identity-client", () => import("/identity-client.js")],

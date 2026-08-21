@@ -9,6 +9,7 @@ import {
   updateGlicko2,
   inflateRatingForInactivity,
 } from "./qili-rating.mjs";
+import { ratingPoolForTimeControl } from "./time-controls.mjs";
 import { loadComputerRatings, recordComputerCalibration as updateComputerCalibration } from "./qili-bot-calibration.mjs";
 
 const { Pool } = pg;
@@ -37,10 +38,6 @@ function serializableRoom(room) {
   if (copy.players?.black) copy.players.black.connected = false;
   delete copy.saved;
   return copy;
-}
-
-function ratingPoolForTimeControl(timeControl) {
-  return Number(timeControl?.baseSeconds || 0) <= 300 ? "blitz" : "rapid";
 }
 
 function emptyRating(pool) {
@@ -120,7 +117,7 @@ async function initializePersistence() {
       await pgPool.query(`
         CREATE TABLE IF NOT EXISTS qili_ratings (
           user_id TEXT NOT NULL REFERENCES qili_users(id) ON DELETE CASCADE,
-          pool TEXT NOT NULL CHECK (pool IN ('rapid', 'blitz')),
+          pool TEXT NOT NULL CHECK (pool IN ('rapid', 'blitz', 'bullet')),
           rating INTEGER NOT NULL DEFAULT 1500,
           deviation DOUBLE PRECISION NOT NULL DEFAULT 350,
           volatility DOUBLE PRECISION NOT NULL DEFAULT 0.06,
@@ -141,7 +138,7 @@ async function initializePersistence() {
       await pgPool.query(`
         CREATE TABLE IF NOT EXISTS rating_events (
           game_id TEXT PRIMARY KEY REFERENCES online_games(id) ON DELETE CASCADE,
-          pool TEXT NOT NULL CHECK (pool IN ('rapid', 'blitz')),
+          pool TEXT NOT NULL CHECK (pool IN ('rapid', 'blitz', 'bullet')),
           red_user_id TEXT NOT NULL REFERENCES qili_users(id) ON DELETE CASCADE,
           black_user_id TEXT NOT NULL REFERENCES qili_users(id) ON DELETE CASCADE,
           red_before INTEGER NOT NULL,
@@ -159,6 +156,24 @@ async function initializePersistence() {
       await pgPool.query("ALTER TABLE rating_events ADD COLUMN IF NOT EXISTS red_rd_after DOUBLE PRECISION");
       await pgPool.query("ALTER TABLE rating_events ADD COLUMN IF NOT EXISTS black_rd_before DOUBLE PRECISION");
       await pgPool.query("ALTER TABLE rating_events ADD COLUMN IF NOT EXISTS black_rd_after DOUBLE PRECISION");
+      for (const table of ["qili_ratings", "rating_events"]) {
+        await pgPool.query(`
+          DO $$
+          DECLARE r RECORD;
+          BEGIN
+            FOR r IN
+              SELECT conname FROM pg_constraint
+              WHERE conrelid = '${table}'::regclass
+                AND contype = 'c'
+                AND pg_get_constraintdef(oid) ILIKE '%pool%'
+            LOOP
+              EXECUTE format('ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS %I', r.conname);
+            END LOOP;
+          END $$;
+        `);
+      }
+      await pgPool.query("ALTER TABLE qili_ratings ADD CONSTRAINT qili_ratings_pool_check CHECK (pool IN ('rapid', 'blitz', 'bullet'))");
+      await pgPool.query("ALTER TABLE rating_events ADD CONSTRAINT rating_events_pool_check CHECK (pool IN ('rapid', 'blitz', 'bullet'))");
 
       await pgPool.query(`
         CREATE TABLE IF NOT EXISTS qili_bot_ratings (
@@ -213,6 +228,22 @@ async function initializePersistence() {
           migrationClient.release();
         }
       }
+
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS computer_games (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES qili_users(id) ON DELETE CASCADE,
+          created_at TIMESTAMPTZ NOT NULL,
+          started_at TIMESTAMPTZ,
+          finished_at TIMESTAMPTZ NOT NULL,
+          time_control JSONB NOT NULL,
+          opponent TEXT,
+          color TEXT NOT NULL DEFAULT 'red',
+          result JSONB NOT NULL,
+          moves JSONB NOT NULL
+        )
+      `);
+      await pgPool.query("CREATE INDEX IF NOT EXISTS computer_games_user_idx ON computer_games (user_id, finished_at DESC)");
 
       await pgPool.query("CREATE INDEX IF NOT EXISTS online_games_finished_at_idx ON online_games (finished_at DESC)");
       await pgPool.query("CREATE INDEX IF NOT EXISTS online_games_red_user_idx ON online_games (red_user_id, finished_at DESC)");
@@ -320,7 +351,7 @@ async function updateUserDisplayName(userId, displayName) {
 }
 
 async function getRatingsForUser(userId) {
-  const ratings = { rapid: emptyRating("rapid"), blitz: emptyRating("blitz") };
+  const ratings = { rapid: emptyRating("rapid"), blitz: emptyRating("blitz"), bullet: emptyRating("bullet") };
   if (!state.postgresReady || !pgPool || !userId) return ratings;
   const result = await pgPool.query(
     `SELECT pool, rating, deviation, volatility, last_rated_at, games, wins, draws, losses
@@ -345,10 +376,78 @@ async function recordComputerCalibration(payload) {
   return updateComputerCalibration(pgPool, payload);
 }
 
+function mapOnlineHistoryRow(row, userId) {
+  const isRed = row.red_user_id === userId;
+  const before = row.rating_pool ? Number(isRed ? row.red_before : row.black_before) : null;
+  const after = row.rating_pool ? Number(isRed ? row.red_after : row.black_after) : null;
+  return {
+    id: row.id,
+    source: "online",
+    createdAt: row.created_at,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    timeControl: row.time_control,
+    color: isRed ? "red" : "black",
+    opponent: isRed ? (row.black_name || "黑方") : (row.red_name || "红方"),
+    result: row.result,
+    moves: row.moves,
+    ratingPool: row.rating_pool || null,
+    ratingBefore: before,
+    ratingAfter: after,
+    ratingDelta: before == null || after == null ? null : after - before,
+  };
+}
+
+function mapComputerHistoryRow(row) {
+  return {
+    id: row.id,
+    source: "computer",
+    createdAt: row.created_at,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+    timeControl: row.time_control,
+    color: row.color || "red",
+    opponent: row.opponent || "电脑",
+    result: row.result,
+    moves: row.moves,
+    ratingPool: null,
+    ratingBefore: null,
+    ratingAfter: null,
+    ratingDelta: null,
+  };
+}
+
+async function saveComputerGame(userId, game) {
+  if (!state.postgresReady || !pgPool || !userId || !game?.id || !Array.isArray(game.moves)) return false;
+  await pgPool.query(
+    `INSERT INTO computer_games (
+       id, user_id, created_at, started_at, finished_at, time_control, opponent, color, result, moves
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     ON CONFLICT (id) DO UPDATE SET
+       finished_at = EXCLUDED.finished_at,
+       result = EXCLUDED.result,
+       moves = EXCLUDED.moves,
+       opponent = EXCLUDED.opponent`,
+    [
+      String(game.id).slice(0, 100),
+      userId,
+      new Date(game.createdAt || game.startedAt || game.finishedAt || Date.now()),
+      game.startedAt ? new Date(game.startedAt) : null,
+      new Date(game.finishedAt || Date.now()),
+      JSON.stringify(game.timeControl || { mode: "computer" }),
+      game.opponent || "电脑",
+      game.color === "black" ? "black" : "red",
+      JSON.stringify(game.result || {}),
+      JSON.stringify(game.moves),
+    ],
+  );
+  return true;
+}
+
 async function listGamesForUser(userId, limit = 20) {
   if (!state.postgresReady || !pgPool || !userId) return { games: [], total: 0 };
   const safeLimit = Math.max(1, Math.min(50, Number(limit) || 20));
-  const [gamesResult, countResult] = await Promise.all([
+  const [gamesResult, computerResult, onlineCount, computerCount] = await Promise.all([
     pgPool.query(
       `SELECT g.id, g.created_at, g.started_at, g.finished_at, g.time_control,
               g.red_name, g.black_name, g.red_user_id, g.black_user_id, g.result, g.moves,
@@ -362,33 +461,32 @@ async function listGamesForUser(userId, limit = 20) {
       [userId, safeLimit],
     ),
     pgPool.query(
+      `SELECT id, created_at, started_at, finished_at, time_control, opponent, color, result, moves
+         FROM computer_games
+        WHERE user_id = $1
+        ORDER BY finished_at DESC
+        LIMIT $2`,
+      [userId, safeLimit],
+    ).catch(() => ({ rows: [] })),
+    pgPool.query(
       "SELECT COUNT(*)::int AS count FROM online_games WHERE red_user_id = $1 OR black_user_id = $1",
       [userId],
     ),
+    pgPool.query(
+      "SELECT COUNT(*)::int AS count FROM computer_games WHERE user_id = $1",
+      [userId],
+    ).catch(() => ({ rows: [{ count: 0 }] })),
   ]);
 
+  const games = [
+    ...gamesResult.rows.map((row) => mapOnlineHistoryRow(row, userId)),
+    ...computerResult.rows.map(mapComputerHistoryRow),
+  ].sort((a, b) => Number(new Date(b.finishedAt)) - Number(new Date(a.finishedAt)))
+    .slice(0, safeLimit);
+
   return {
-    total: Number(countResult.rows[0]?.count || 0),
-    games: gamesResult.rows.map((row) => {
-      const isRed = row.red_user_id === userId;
-      const before = row.rating_pool ? Number(isRed ? row.red_before : row.black_before) : null;
-      const after = row.rating_pool ? Number(isRed ? row.red_after : row.black_after) : null;
-      return {
-        id: row.id,
-        createdAt: row.created_at,
-        startedAt: row.started_at,
-        finishedAt: row.finished_at,
-        timeControl: row.time_control,
-        color: isRed ? "red" : "black",
-        opponent: isRed ? (row.black_name || "黑方") : (row.red_name || "红方"),
-        result: row.result,
-        moves: row.moves,
-        ratingPool: row.rating_pool || null,
-        ratingBefore: before,
-        ratingAfter: after,
-        ratingDelta: before == null || after == null ? null : after - before,
-      };
-    }),
+    total: Number(onlineCount.rows[0]?.count || 0) + Number(computerCount.rows[0]?.count || 0),
+    games,
   };
 }
 
@@ -624,6 +722,7 @@ export {
   getRatingsForUser,
   getComputerRatings,
   recordComputerCalibration,
+  saveComputerGame,
   listGamesForUser,
   saveRoom,
   loadRooms,

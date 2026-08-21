@@ -265,9 +265,11 @@ const server = createServer(async (request, response) => {
   const pathname = decodeURIComponent(url.pathname);
   const normalized = normalize(pathname).replace(/^([/\\])+/, "");
   const candidate = join(DIST_DIR, normalized || "index.html");
+  const publicCandidate = join(ROOT_DIR, "public", normalized);
   const isAssetRequest = pathname.startsWith("/assets/") || /\/[^/]+\.[^/]+$/.test(pathname);
 
   if (candidate.startsWith(DIST_DIR) && await sendFile(request, response, candidate)) return;
+  if (normalized && publicCandidate.startsWith(join(ROOT_DIR, "public")) && await sendFile(request, response, publicCandidate)) return;
   if (isAssetRequest) {
     response.writeHead(404, {
       "content-type": "text/plain; charset=utf-8",

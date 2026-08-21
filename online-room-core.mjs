@@ -1,18 +1,10 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { RED, BLACK, OPPOSITE, createInitialBoard, applyMove, validateMove, gameStatus } from "./xiangqi-server-rules.mjs";
+import { normalizeTimeControl } from "./time-controls.mjs";
 
 const rooms = new Map();
 const makeToken = () => randomBytes(18).toString("base64url");
 const cleanName = (value, fallback = "棋手") => ((typeof value === "string" ? value.trim() : "") || fallback).slice(0, 24);
-
-function normalizeTimeControl(value) {
-  const options = [
-    { baseSeconds: 600, incrementSeconds: 0, label: "10+0" },
-    { baseSeconds: 600, incrementSeconds: 5, label: "10+5" },
-    { baseSeconds: 300, incrementSeconds: 3, label: "5+3" },
-  ];
-  return options.find((item) => item.baseSeconds === Number(value?.baseSeconds) && item.incrementSeconds === Number(value?.incrementSeconds)) || options[0];
-}
 
 function newPlayer(name, suppliedToken = null, userId = null) {
   return {

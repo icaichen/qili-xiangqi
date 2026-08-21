@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -186,21 +186,24 @@ function createMatchTicket(name, timeControl, userId = null) {
   );
   tickets.set(ticket.id, ticket);
   if (opponent) {
+    const waitingIsRed = randomInt(2) === 0;
+    const redSeat = waitingIsRed ? opponent : ticket;
+    const blackSeat = waitingIsRed ? ticket : opponent;
     const room = createRoom({
-      redName: opponent.name,
-      redToken: opponent.playerToken,
-      redUserId: opponent.userId || null,
-      blackName: ticket.name,
-      blackToken: ticket.playerToken,
-      blackUserId: ticket.userId || null,
+      redName: redSeat.name,
+      redToken: redSeat.playerToken,
+      redUserId: redSeat.userId || null,
+      blackName: blackSeat.name,
+      blackToken: blackSeat.playerToken,
+      blackUserId: blackSeat.userId || null,
       timeControl: ticket.timeControl,
     });
     opponent.status = "matched";
     opponent.roomId = room.id;
-    opponent.color = RED;
+    opponent.color = waitingIsRed ? RED : BLACK;
     ticket.status = "matched";
     ticket.roomId = room.id;
-    ticket.color = BLACK;
+    ticket.color = waitingIsRed ? BLACK : RED;
   }
   return ticket;
 }
@@ -241,6 +244,7 @@ async function handleOnlineRequest(request, response) {
         redUserId: account?.id || null,
         timeControl: body.timeControl,
       });
+      // Private rooms: the creator sits red and moves first. Matchmaking assigns colors at random.
       await saveRoom(room);
       json(response, 201, { room: snapshot(room, room.players.red.token), playerToken: room.players.red.token, color: RED });
       return true;

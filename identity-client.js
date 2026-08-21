@@ -77,19 +77,23 @@ function ratingRecord(pool) {
   };
 }
 
+function renderPoolRating(pool, ratingId, metaId, emptyNote) {
+  const record = ratingRecord(pool);
+  const ratingEl = document.querySelector(ratingId);
+  const metaEl = document.querySelector(metaId);
+  if (ratingEl) ratingEl.textContent = String(record.rating ?? 1500);
+  const state = record.provisional ? "定级中" : `稳定度${record.stability || "高"}`;
+  if (metaEl) {
+    metaEl.textContent = record.games
+      ? `${state} · ${record.games} 局 · ${record.wins}胜 ${record.draws}和 ${record.losses}负`
+      : emptyNote;
+  }
+}
+
 function renderRatings() {
-  const rapid = ratingRecord("rapid");
-  const blitz = ratingRecord("blitz");
-  const rapidEl = document.querySelector("#profileRapidRating");
-  const blitzEl = document.querySelector("#profileBlitzRating");
-  const rapidMeta = document.querySelector("#profileRapidMeta");
-  const blitzMeta = document.querySelector("#profileBlitzMeta");
-  if (rapidEl) rapidEl.textContent = String(rapid.rating ?? 1500);
-  if (blitzEl) blitzEl.textContent = String(blitz.rating ?? 1500);
-  const rapidState = rapid.provisional ? "定级中" : `稳定度${rapid.stability || "高"}`;
-  const blitzState = blitz.provisional ? "定级中" : `稳定度${blitz.stability || "高"}`;
-  if (rapidMeta) rapidMeta.textContent = rapid.games ? `${rapidState} · ${rapid.games} 局 · ${rapid.wins}胜 ${rapid.draws}和 ${rapid.losses}负` : "Qili 初始 1500 · 定级中";
-  if (blitzMeta) blitzMeta.textContent = blitz.games ? `${blitzState} · ${blitz.games} 局 · ${blitz.wins}胜 ${blitz.draws}和 ${blitz.losses}负` : "Qili 初始 1500 · 定级中";
+  renderPoolRating("rapid", "#profileRapidRating", "#profileRapidMeta", "Qili 初始 1500 · 定级中 · 10 分钟及以上");
+  renderPoolRating("blitz", "#profileBlitzRating", "#profileBlitzMeta", "Qili 初始 1500 · 定级中 · 3–5 分钟");
+  renderPoolRating("bullet", "#profileBulletRating", "#profileBulletMeta", "Qili 初始 1500 · 定级中 · 1–2 分钟");
 }
 
 function renderComputerLevels() {
@@ -132,6 +136,7 @@ async function reportComputerResult(game) {
       gameId: game.id,
       level: game.timeControl?.level,
       winner: game.result?.winner ?? null,
+      game,
     }),
   });
   computerLevels = payload.levels || computerLevels;
@@ -313,10 +318,16 @@ function resultReason(reason) {
 }
 
 function ratingDeltaText(game) {
+  if (game.source === "computer" || game.timeControl?.mode === "computer") return "电脑局 · 不计分";
   if (game.ratingDelta == null) return "未计分";
   const sign = game.ratingDelta > 0 ? "+" : "";
-  const pool = game.ratingPool === "blitz" ? "Blitz" : "Rapid";
+  const pool = game.ratingPool === "bullet" ? "Bullet" : game.ratingPool === "blitz" ? "Blitz" : "Rapid";
   return `${pool} ${sign}${game.ratingDelta}`;
+}
+
+function gameSourceLabel(game) {
+  if (game.source === "computer" || game.timeControl?.mode === "computer") return "电脑";
+  return "真人";
 }
 
 function escapeHtml(value) {
@@ -675,7 +686,7 @@ function renderReviewGameList() {
     const tc = game.timeControl?.label || `${game.timeControl?.baseSeconds || 0}+${game.timeControl?.incrementSeconds || 0}`;
     return `<button class="review-game-row${activeReviewGame?.id === game.id ? " active" : ""}" data-review-game="${escapeHtml(game.id)}">
       <strong>${result} · vs ${escapeHtml(game.opponent || "对手")}</strong>
-      <small>${game.color === "red" ? "执红" : "执黑"} · ${escapeHtml(tc)} · ${Array.isArray(game.moves) ? game.moves.length : 0} 手 · ${escapeHtml(when)}</small>
+      <small>${game.source === "computer" || game.timeControl?.mode === "computer" ? "电脑" : "真人"} · ${game.color === "red" ? "执红" : "执黑"} · ${escapeHtml(tc)} · ${Array.isArray(game.moves) ? game.moves.length : 0} 手 · ${escapeHtml(when)}</small>
     </button>`;
   }).join("");
 }
@@ -741,6 +752,7 @@ async function startReview(game) {
     const analysis = await window.XiangqiEngineClient.analyzeGame(game, { depth: 7, maxPlayerMoves: 36 });
     if (requestId !== reviewRequestId) return;
     activeReviewAnalysis = analysis;
+    window.QiliAbility?.ingestGame?.(game, analysis);
     renderReviewResults();
     if (status) status.textContent = "复盘完成";
   } catch (error) {
@@ -1036,6 +1048,12 @@ async function learnReviewTurningPoint() {
     const deep = await window.QiliReviewCoach.analyzePosition(board, actualMove, { depth: 12, routeLimit: 10 });
     if (requestId !== reviewDeepRequestId || activeReviewGame?.id !== gameId || Number(activeReviewPly) !== Number(point.ply)) return;
     activeReviewDeep = { ...deep, ply: point.ply };
+    if (deep.analysis) {
+      deep.analysis.ply = point.ply;
+      deep.analysis.source = "review";
+      deep.analysis.gameId = gameId;
+      window.QiliAbility?.ingest?.(deep.analysis);
+    }
     const note = document.querySelector("#reviewBoardNote");
     if (note && deep.analysis) note.textContent = `你走 ${deep.analysis.moveNotation} · 更推荐 ${deep.analysis.bestMove}`;
     renderReviewWhy(activeReviewDeep);
@@ -1389,6 +1407,7 @@ startReview = async function(game) {
     const analysis = await window.XiangqiEngineClient.analyzeGame(game, { depth: 7, maxPlayerMoves: 36 });
     if (requestId !== reviewRequestId) return;
     activeReviewAnalysis = analysis;
+    window.QiliAbility?.ingestGame?.(game, analysis);
     renderReviewResults();
     if (status) status.textContent = '复盘完成';
   } catch (error) {
@@ -1678,7 +1697,7 @@ exitReviewRoutePlayback = function() {
 
 function renderHistory(payload) {
   const count = document.querySelector("#profileGameCount");
-  if (count) count.textContent = String(payload?.total ?? 0);
+  if (count) count.textContent = String(payload?.total ?? payload?.games?.length ?? 0);
 
   if (payload?.ratings && account) {
     saveAccount({ ...account, ratings: payload.ratings });
@@ -1688,7 +1707,7 @@ function renderHistory(payload) {
   if (!list) return;
   const games = payload?.games || [];
   if (!games.length) {
-    list.innerHTML = '<div class="profile-history-empty"><strong>还没有真人历史对局</strong><p>完成一盘真人棋后会自动出现在这里。</p></div>';
+    list.innerHTML = '<div class="profile-history-empty"><strong>还没有对局</strong><p>下一盘电脑或真人棋后，会自动出现在这里。</p></div>';
     return;
   }
 
@@ -1699,12 +1718,24 @@ function renderHistory(payload) {
     const cls = result === "胜" ? "win" : result === "负" ? "loss" : "draw";
     const tc = item.timeControl?.label || `${item.timeControl?.baseSeconds || 0}+${item.timeControl?.incrementSeconds || 0}`;
     const deltaClass = item.ratingDelta > 0 ? "up" : item.ratingDelta < 0 ? "down" : "flat";
+    const source = gameSourceLabel(item);
     return `<article class="profile-history-row">
       <span class="profile-result ${cls}">${result}</span>
-      <div><strong>${escapeHtml(item.opponent || "对手")}</strong><small>${item.color === "red" ? "执红" : "执黑"} · ${escapeHtml(tc)} · ${escapeHtml(resultReason(item.result?.reason))}</small></div>
-      <div class="profile-history-meta"><span class="rating-delta ${deltaClass}">${ratingDeltaText(item)}</span><small>${Array.isArray(item.moves) ? item.moves.length : 0} 手 · ${escapeHtml(when)}</small></div>
+      <div><strong>${escapeHtml(item.opponent || "对手")}</strong><small>${escapeHtml(source)} · ${item.color === "red" ? "执红" : "执黑"} · ${escapeHtml(tc)} · ${escapeHtml(resultReason(item.result?.reason))}</small></div>
+      <div class="profile-history-meta"><span class="rating-delta ${deltaClass}">${ratingDeltaText(item)}</span><small>${Array.isArray(item.moves) ? item.moves.length : 0} 手 · ${escapeHtml(when)}</small>
+      <button type="button" class="button button-ghost" data-review-game="${escapeHtml(item.id)}">分析</button></div>
     </article>`;
   }).join("");
+  list.querySelectorAll("[data-review-game]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const game = games.find((entry) => entry.id === button.dataset.reviewGame);
+      if (!game?.moves?.length) return;
+      window.XiangqiPlatform?.switchView?.("review");
+      void startReview(game);
+    });
+  });
 }
 
 async function loadHistory() {
@@ -1712,12 +1743,32 @@ async function loadHistory() {
   historyLoading = true;
   const list = document.querySelector("#profileRecentGames");
   if (list) list.dataset.loading = "true";
+  const localGames = loadComputerReviewGames().map((game) => ({
+    ...game,
+    source: "computer",
+    ratingDelta: null,
+  }));
   try {
     await ensureIdentity();
     const payload = await apiRequest("/api/identity/me/games?limit=20");
-    renderHistory(payload);
+    const remote = payload?.games || [];
+    const byId = new Map();
+    for (const game of localGames) byId.set(game.id, game);
+    for (const game of remote) byId.set(game.id, { ...byId.get(game.id), ...game });
+    const games = [...byId.values()]
+      .sort((a, b) => Number(new Date(b.finishedAt)) - Number(new Date(a.finishedAt)))
+      .slice(0, 30);
+    renderHistory({
+      ...payload,
+      games,
+      total: games.length,
+    });
     return payload;
   } catch (error) {
+    if (localGames.length) {
+      renderHistory({ games: localGames, total: localGames.length });
+      return { games: localGames };
+    }
     if (list) list.innerHTML = `<div class="profile-history-empty"><strong>历史棋局暂时无法读取</strong><p>${escapeHtml(error.message)}</p></div>`;
     return null;
   } finally {
@@ -1823,6 +1874,7 @@ window.QiliIdentity = {
   syncDisplayName,
   loadHistory,
   loadReviewGames,
+  openReview: startReview,
   getAccountToken,
   getAuthToken,
   getUser,

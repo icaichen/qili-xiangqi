@@ -15,7 +15,7 @@ const PIECE_VALUES = {
   general: 10000,
   rook: 900,
   cannon: 450,
-  horse: 420,
+  horse: 400,
   elephant: 220,
   advisor: 220,
   pawn: 100,
@@ -838,6 +838,9 @@ async function analyzeHumanMoveInBackground(sourceBoard, afterHumanBoard, move) 
     const before = await engineClient.analyze(sourceBoard, COLORS.RED, { depth: coachDepth, multiPv: 4, maxTimeMs: 500 });
     const after = await engineClient.analyze(afterHumanBoard, COLORS.BLACK, { depth: coachDepth, multiPv: 2, maxTimeMs: 350 });
     coachAnalysis = buildCoachAnalysis(sourceBoard, move, before, after);
+    coachAnalysis.ply = history.length;
+    coachAnalysis.source = "play";
+    coachAnalysis.gameId = computerGameId;
     if (window.QiliLearn?.ingestAnalysis) window.QiliLearn.ingestAnalysis(coachAnalysis);
     else {
       const types = [...(coachAnalysis.chosenFacts || []), ...(coachAnalysis.replyFacts || [])].map((item) => item.type).filter(Boolean);

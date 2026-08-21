@@ -56,7 +56,7 @@ const result = tools.buildCoachAnalysis({
     formatMove,
     uciToMove,
     moveToUci,
-    pieceValues: { general: 10000, rook: 900, cannon: 450, horse: 420, elephant: 220, advisor: 220, pawn: 100 },
+    pieceValues: { general: 10000, rook: 900, cannon: 450, horse: 400, elephant: 220, advisor: 220, pawn: 100 },
     opposite: { red: "black", black: "red" },
   },
 });
