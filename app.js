@@ -1796,9 +1796,26 @@ function switchPlatformView(viewName) {
   }
   const requestedTarget = platformViews[viewName] ? viewName : "home";
   const target = requestedTarget === "learn" && document.body.classList.contains("kids-mode") ? "kids" : requestedTarget;
-  const navTarget = target === "online" ? "play" : target === "kids" ? "learn" : target;
+  const navTarget = target === "online" || target === "play"
+    ? "play"
+    : target === "kids" || target === "learn" || target === "train"
+      ? "learn"
+      : target === "review" || target === "analysis"
+        ? "review"
+        : target;
   Object.entries(platformViews).forEach(([name, element]) => element?.classList.toggle("hidden", name !== target));
-  document.querySelectorAll(".platform-nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === navTarget));
+  document.querySelectorAll(".platform-nav-item").forEach((item) => {
+    const active = (item.dataset.navRoot || item.dataset.view) === navTarget;
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
+  document.querySelectorAll(".platform-subnav-item").forEach((item) => {
+    const active = item.dataset.targetView === target || (target === "kids" && item.dataset.targetView === "learn");
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
   document.querySelector(".play-only-action")?.classList.toggle("hidden", target !== "play");
   quickPlayButtonElement?.classList.toggle("hidden", target === "play" || target === "online");
   document.body.classList.toggle("play-mode", target === "play");
@@ -1834,6 +1851,30 @@ window.XiangqiPlatform = { switchView: switchPlatformView };
 
 document.querySelectorAll(".platform-nav-item").forEach((item) => item.addEventListener("click", () => switchPlatformView(item.dataset.view)));
 document.querySelectorAll(".platform-jump").forEach((item) => item.addEventListener("click", () => switchPlatformView(item.dataset.targetView)));
+const homeTimeButtons = [...document.querySelectorAll("[data-home-time]")];
+const homeOnlineBattleAction = document.querySelector("#homeOnlineBattleAction");
+let homeTimeControl = homeTimeButtons.find((button) => button.classList.contains("active"))?.dataset.homeTime || "180+2";
+const homeTimeLabel = (value) => ({ "60+0": "1+0", "180+2": "3+2", "600+0": "10+0" }[value] || value);
+homeTimeButtons.forEach((button) => {
+  button.setAttribute("aria-pressed", String(button.dataset.homeTime === homeTimeControl));
+  button.addEventListener("click", () => {
+    homeTimeControl = button.dataset.homeTime || "180+2";
+    homeTimeButtons.forEach((item) => {
+      const active = item === button;
+      item.classList.toggle("active", active);
+      item.setAttribute("aria-pressed", String(active));
+    });
+    if (homeOnlineBattleAction) homeOnlineBattleAction.innerHTML = `进入 ${homeTimeLabel(homeTimeControl)} 对战 <span>→</span>`;
+  });
+});
+homeOnlineBattleAction?.addEventListener("click", () => {
+  const select = document.querySelector("#onlineTimeControl");
+  if (select) {
+    select.value = homeTimeControl;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  switchPlatformView("online");
+});
 quickPlayButtonElement?.addEventListener("click", () => switchPlatformView("play"));
 learnNotationButtonElement?.addEventListener("click", openNotationLesson);
 

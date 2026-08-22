@@ -311,13 +311,33 @@
           <button id="topbarSignIn" class="button button-primary" type="button">登录</button>
         </div>
         <nav class="platform-nav" aria-label="平台导航">
-          <button class="platform-nav-item active" data-view="home">首页</button>
-          <button class="platform-nav-item" data-view="play">下棋</button>
-          <button class="platform-nav-item" data-view="train">训练</button>
-          <button class="platform-nav-item" data-view="learn">学习中心</button>
-          <button class="platform-nav-item" data-view="review">复盘</button>
-          <button class="platform-nav-item" data-view="analysis">分析</button>
-          <button class="platform-nav-item" data-view="profile">我的</button>
+          <div class="platform-nav-group">
+            <button class="platform-nav-item active" data-view="home" data-icon="⌂">首页</button>
+          </div>
+          <div class="platform-nav-group" data-nav-group="play">
+            <button class="platform-nav-item" data-view="online" data-nav-root="play" data-icon="弈">对战</button>
+            <div class="platform-subnav" aria-label="对战">
+              <button class="platform-subnav-item platform-jump" data-target-view="online">在线对战</button>
+              <button class="platform-subnav-item platform-jump" data-target-view="play">AI 对战</button>
+            </div>
+          </div>
+          <div class="platform-nav-group" data-nav-group="learn">
+            <button class="platform-nav-item" data-view="learn" data-icon="学">学习</button>
+            <div class="platform-subnav" aria-label="学习">
+              <button class="platform-subnav-item platform-jump" data-target-view="learn">课程</button>
+              <button class="platform-subnav-item platform-jump" data-target-view="train">训练</button>
+            </div>
+          </div>
+          <div class="platform-nav-group" data-nav-group="review">
+            <button class="platform-nav-item" data-view="review" data-icon="析">复盘</button>
+            <div class="platform-subnav" aria-label="复盘">
+              <button class="platform-subnav-item platform-jump" data-target-view="review">我的棋局</button>
+              <button class="platform-subnav-item platform-jump" data-target-view="analysis">AI 分析</button>
+            </div>
+          </div>
+          <div class="platform-nav-group">
+            <button class="platform-nav-item" data-view="profile" data-icon="我">我的</button>
+          </div>
         </nav>
         <div class="topbar-actions">
           <button id="openNotationButton" class="button button-ghost">记谱教学</button>
@@ -327,19 +347,107 @@
       </header>
 
       <section id="homeView" class="platform-view home-view">
-        <div class="home-grid">
-          <section class="home-hero platform-surface">
-            <div><span class="eyebrow">XIANGQI · PLAY / REVIEW / IMPROVE</span><h1>每一盘，<br>都有下一步。</h1><p>下棋、复盘、找到弱点、针对训练。不是记住最佳着，而是真的知道下一步该练什么。</p><div class="hero-actions"><button class="button button-primary platform-jump" data-target-view="online">真人在线对弈</button><button class="button button-ghost platform-jump" data-target-view="play">与电脑下棋</button></div></div>
-            <div class="home-hero-board"><span>TODAY</span><strong>先下一盘。<br>剩下的交给复盘。</strong><p>有真实对局以后，训练才会真正属于你。</p><small>不展示虚构能力数据</small></div>
+        <div class="home-dashboard">
+          <header class="home-welcome">
+            <div>
+              <span class="eyebrow">我的棋院 · <span id="homeTodayLabel">今天</span></span>
+              <h1>欢迎回来，<strong id="homeDisplayName">棋手</strong></h1>
+              <p id="homeWelcomeNote">棋力、对局与训练进度，都从这里继续。</p>
+            </div>
+            <button class="home-quiet-action platform-jump" data-target-view="profile" type="button">查看棋手档案 <span>→</span></button>
+          </header>
+
+          <section class="home-battle-section" aria-labelledby="homeBattleTitle">
+            <div class="home-section-heading">
+              <div><span class="eyebrow">PLAY · 对战</span><h2 id="homeBattleTitle">现在，下一盘。</h2></div>
+              <p>选一种节奏开始；这一盘会成为下一次复盘和训练的起点。</p>
+            </div>
+            <div class="home-battle-hub">
+              <article class="home-battle-primary">
+                <div class="home-battle-copy">
+                  <span class="home-battle-live"><i></i> 真人在线</span>
+                  <h3>快速匹配一位棋手</h3>
+                  <p>先选时间制，进入对战大厅后即可开始匹配。</p>
+                </div>
+                <div class="home-time-controls" role="group" aria-label="选择对战时间">
+                  <button type="button" data-home-time="60+0"><strong>1+0</strong><small>超快棋</small></button>
+                  <button type="button" class="active" data-home-time="180+2"><strong>3+2</strong><small>快棋</small></button>
+                  <button type="button" data-home-time="600+0"><strong>10+0</strong><small>中局</small></button>
+                </div>
+                <button id="homeOnlineBattleAction" class="button home-battle-cta" type="button">进入 3+2 对战 <span>→</span></button>
+                <small class="home-battle-footnote">也可以在对战大厅创建私人房间</small>
+              </article>
+              <aside class="home-battle-side">
+                <article class="home-battle-rating">
+                  <span id="homeRatingPool">RAPID · QILI</span>
+                  <strong id="homeCurrentRating">1500</strong>
+                  <small id="homeRatingMeta">当前棋力 · 定级中</small>
+                </article>
+                <button class="home-ai-battle platform-jump" data-target-view="play" type="button">
+                  <span>AI 对战</span>
+                  <strong>挑战适合你的电脑棋力</strong>
+                  <small>不影响真人 Qili 分 <i>→</i></small>
+                </button>
+              </aside>
+            </div>
           </section>
-          <section class="home-action-grid">
-            <article class="home-action-card"><b>棋</b><span class="eyebrow">立即开始</span><h2>下棋</h2><p>真人快速匹配和私人房间已经开放；也可以继续使用本地 Pikafish 人机对弈。</p><button class="button button-primary platform-jump" data-target-view="online">真人在线</button></article>
-            <article class="home-action-card"><b>学</b><span class="eyebrow">学习中心</span><h2>下一课该练什么</h2><p>从规则、保护、交换到基本战术。有对局之后，会优先补你刚暴露的漏洞。</p><button class="button button-ghost platform-jump" data-target-view="learn">打开学习中心</button></article>
-            <article class="home-action-card"><b>盘</b><span class="eyebrow">复盘</span><h2>看懂自己的棋</h2><p>用真实对局找到关键失误，而不是刷一本无关的课程。</p><button class="button button-ghost platform-jump" data-target-view="review">去复盘</button></article>
+
+          <section class="home-overview" aria-label="本周状态">
+            <article class="home-overview-card">
+              <span>本周对局</span>
+              <strong id="homeWeeklyGames">0</strong>
+              <small id="homeWeeklyGamesMeta">完成一盘后开始记录</small>
+            </article>
+            <article class="home-overview-card">
+              <span>连续活跃</span>
+              <strong><span id="homeActiveStreak">0</span><em> 天</em></strong>
+              <small id="homeActiveStreakMeta">今天还没有完成对局</small>
+            </article>
+            <article class="home-overview-card">
+              <span>近 5 盘变化</span>
+              <strong id="homeRecentDelta">—</strong>
+              <small id="homeRecentDeltaMeta">暂无真人计分变化</small>
+            </article>
           </section>
-          <section class="home-lower-grid">
-            <article class="platform-surface home-status-card" id="homeAbilityCard"><span class="eyebrow">你的成长</span><h2>能力画像</h2><p>将军识别 · 吃子判断 · 保护意识 · 交换判断 · 战术配合 · 开局出子</p><small>完成足够对局后才显示真实能力数据。</small></article>
-            <article class="platform-surface home-status-card"><span class="eyebrow">平台状态</span><h2>当前可用</h2><p>✓ 真人快速匹配<br>✓ 私人房间对弈<br>✓ 学习中心（可练习课）<br>✓ 本地 Pikafish 人机对弈</p></article>
+
+          <section class="home-next-section">
+            <div class="home-section-heading">
+              <div><span class="eyebrow">CONTINUE · 继续提升</span><h2>从上次停下的地方继续</h2></div>
+              <p>复盘上一盘，或把上次学到的继续练完。</p>
+            </div>
+            <div class="home-next-grid">
+              <article class="home-next-card">
+                <span class="home-next-index">01</span>
+                <div><span class="eyebrow" id="homePrimaryEyebrow">复盘</span><h3 id="homePrimaryTitle">还没有待复盘棋局</h3><p id="homePrimaryNote">完成对局后，从最大的转折点继续。</p></div>
+                <button id="homePrimaryAction" class="button button-ghost platform-jump" data-target-view="review" type="button" disabled>完成首盘后解锁</button>
+              </article>
+              <article class="home-next-card">
+                <span class="home-next-index">02</span>
+                <div><span class="eyebrow">课程</span><h3 id="homeCourseTitle">继续上次课程</h3><p id="homeCourseNote">学习中心会根据你的进度和实战问题推荐下一课。</p></div>
+                <button id="homeCourseAction" class="button button-ghost" data-home-action="learn" type="button">继续学习</button>
+              </article>
+              <article class="home-next-card">
+                <span class="home-next-index">03</span>
+                <div><span class="eyebrow">训练</span><h3>完成今日训练</h3><p>把复盘中反复出现的问题，练成下一盘的习惯。</p></div>
+                <button class="button button-ghost platform-jump" data-target-view="train" type="button">开始训练</button>
+              </article>
+            </div>
+          </section>
+
+          <section class="home-insight-grid">
+            <article class="platform-surface home-growth-card" id="homeAbilityCard">
+              <div class="home-section-heading"><div><span class="eyebrow">GROWTH · 成长反馈</span><h2>我的成长</h2></div></div>
+              <div class="home-growth-empty"><strong>还没有足够的实战样本</strong><p>完成对局并复盘后，这里才会展示真实能力变化。</p></div>
+            </article>
+            <article class="platform-surface home-recent-card">
+              <div class="home-section-heading">
+                <div><span class="eyebrow">最近棋局</span><h2>刚刚下过</h2></div>
+                <button class="home-quiet-action platform-jump" data-target-view="review" type="button">全部棋局 <span>→</span></button>
+              </div>
+              <div id="homeRecentGames" class="home-recent-list">
+                <div class="home-recent-empty"><strong>正在读取棋局…</strong></div>
+              </div>
+            </article>
           </section>
         </div>
       </section>
@@ -763,6 +871,8 @@
       </section>
 
       <section id="learnView" class="platform-view learn-page hidden"></section>
+
+      <section id="kidsView" class="platform-view kids-view hidden" aria-label="儿童课程"></section>
 
       <section id="reviewDropzone" class="review-dropzone platform-view hidden">
         <div class="drop-icon">谱</div>

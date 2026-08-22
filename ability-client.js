@@ -336,18 +336,34 @@ function profileHtml(state) {
 function homeHtml(state) {
   if (!state.total || !state.weakest) {
     return `
-      <span class="eyebrow">你的成长</span>
-      <h2>能力画像</h2>
-      <p>${ABILITY_SKILLS.map((skill) => skill.title).join(" · ")}</p>
-      <small>完成足够对局后才显示真实能力数据。</small>`;
+      <div class="home-section-heading">
+        <div><span class="eyebrow">GROWTH · 成长反馈</span><h2>我的成长</h2></div>
+        <p>${state.total ? `已有 ${state.total} 个局面样本` : "来自真实对局与复盘"}</p>
+      </div>
+      <div class="home-growth-empty">
+        <strong>${state.total ? "每项能力还需要更多样本" : "还没有足够的实战样本"}</strong>
+        <p>完成对局并复盘后，才会展示将军、吃子、保护、交换、战术与开局能力。</p>
+      </div>`;
   }
   const weak = state.weakest;
-  const strong = state.strongest && state.strongest.id !== weak.id ? state.strongest : null;
+  const visible = state.skills.filter((skill) => skill.ready).sort((left, right) => left.rate - right.rate).slice(0, 3);
+  const cards = visible.map((skill) => `
+    <div class="home-ability-item ${skill.tone}">
+      <span>${escapeHtml(skill.title)}</span>
+      <strong>${skill.percent}</strong>
+      <small>${escapeHtml(skill.label)} · 最近 ${skill.n} 次相关局面</small>
+    </div>`).join("");
   return `
-    <span class="eyebrow">你的成长</span>
-    <h2>能力画像</h2>
-    <p>${escapeHtml(weak.title)}${escapeHtml(weak.label)}${strong ? ` · ${escapeHtml(strong.title)}${escapeHtml(strong.label)}` : ""}</p>
-    <small>根据最近对局，不是编的。点开「我的」看六项明细。</small>`;
+    <div class="home-section-heading">
+      <div><span class="eyebrow">GROWTH · 成长反馈</span><h2>我的成长</h2></div>
+      <p>根据最近实战局面，不是估算值</p>
+    </div>
+    <div class="home-ability-grid">${cards}</div>
+    <div class="home-coach-note">
+      <b>AI</b>
+      <div><strong>主要问题是${escapeHtml(weak.title)}</strong><small>${escapeHtml(weak.hint)}</small></div>
+      <button type="button" data-ability-lesson="${escapeHtml(weak.lessonId)}">去专项提升 →</button>
+    </div>`;
 }
 
 function bindProfile(root) {
@@ -364,7 +380,10 @@ function render() {
     bindProfile(profile);
   }
   const home = document.querySelector("#homeAbilityCard");
-  if (home) home.innerHTML = homeHtml(state);
+  if (home) {
+    home.innerHTML = homeHtml(state);
+    bindProfile(home);
+  }
 }
 
 const originalIngest = window.QiliLearn?.ingestAnalysis;

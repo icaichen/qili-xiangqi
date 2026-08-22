@@ -175,6 +175,31 @@ function renderIdentity() {
   const displayName = user?.displayName || "棋手";
   const registered = Boolean(user?.registered && window.QiliAuth?.isSignedIn?.());
 
+  const homeName = document.querySelector("#homeDisplayName");
+  if (homeName) homeName.textContent = displayName;
+  const homeToday = document.querySelector("#homeTodayLabel");
+  if (homeToday) {
+    homeToday.textContent = new Intl.DateTimeFormat("zh-CN", {
+      month: "long",
+      day: "numeric",
+      weekday: "short",
+    }).format(new Date());
+  }
+  const ratingPools = ["rapid", "blitz", "bullet"];
+  const primaryPool = ratingPools.sort((left, right) => Number(ratingRecord(right).games || 0) - Number(ratingRecord(left).games || 0))[0];
+  const primaryRating = ratingRecord(primaryPool);
+  const poolLabel = { rapid: "RAPID", blitz: "BLITZ", bullet: "BULLET" }[primaryPool];
+  const homeRatingPool = document.querySelector("#homeRatingPool");
+  const homeCurrentRating = document.querySelector("#homeCurrentRating");
+  const homeRatingMeta = document.querySelector("#homeRatingMeta");
+  if (homeRatingPool) homeRatingPool.textContent = `${poolLabel} · QILI`;
+  if (homeCurrentRating) homeCurrentRating.textContent = String(primaryRating.rating ?? 1500);
+  if (homeRatingMeta) {
+    homeRatingMeta.textContent = primaryRating.games
+      ? `当前棋力 · ${primaryRating.provisional ? "定级中" : `稳定度${primaryRating.stability || "高"}`}`
+      : "当前棋力 · 尚未完成真人定级局";
+  }
+
   const profileName = document.querySelector("#profileDisplayName");
   if (profileName) profileName.textContent = displayName;
 
@@ -1748,6 +1773,8 @@ function renderHistory(payload) {
     saveAccount({ ...account, ratings: payload.ratings });
   }
 
+  renderHomeDashboard(payload);
+
   const list = document.querySelector("#profileRecentGames");
   if (!list) return;
   const games = payload?.games || [];
@@ -1783,6 +1810,128 @@ function renderHistory(payload) {
   });
 }
 
+function localDayKey(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function consecutiveActiveDays(games) {
+  const activeDays = new Set(games.map((game) => localDayKey(game.finishedAt)).filter(Boolean));
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  if (!activeDays.has(localDayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  while (activeDays.has(localDayKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+function renderHomeDashboard(payload) {
+  const games = Array.isArray(payload?.games) ? payload.games : [];
+  const now = new Date();
+  const weekStart = new Date(now);
+  const day = weekStart.getDay();
+  weekStart.setDate(weekStart.getDate() - (day === 0 ? 6 : day - 1));
+  weekStart.setHours(0, 0, 0, 0);
+  const weeklyGames = games.filter((game) => Number(new Date(game.finishedAt)) >= Number(weekStart));
+  const streak = consecutiveActiveDays(games);
+  const ratedRecent = games.filter((game) => game.source !== "computer" && Number.isFinite(Number(game.ratingDelta))).slice(0, 5);
+  const recentDelta = ratedRecent.reduce((sum, game) => sum + Number(game.ratingDelta), 0);
+
+  const weeklyCount = document.querySelector("#homeWeeklyGames");
+  const weeklyMeta = document.querySelector("#homeWeeklyGamesMeta");
+  const streakCount = document.querySelector("#homeActiveStreak");
+  const streakMeta = document.querySelector("#homeActiveStreakMeta");
+  const delta = document.querySelector("#homeRecentDelta");
+  const deltaMeta = document.querySelector("#homeRecentDeltaMeta");
+  if (weeklyCount) weeklyCount.textContent = String(weeklyGames.length);
+  if (weeklyMeta) weeklyMeta.textContent = weeklyGames.length ? `本周已完成 ${weeklyGames.length} 盘` : "本周还没有完成对局";
+  if (streakCount) streakCount.textContent = String(streak);
+  if (streakMeta) streakMeta.textContent = streak ? `连续 ${streak} 个活跃日有完成对局` : "今天还没有完成对局";
+  if (delta) {
+    delta.textContent = ratedRecent.length ? `${recentDelta > 0 ? "+" : ""}${recentDelta}` : "—";
+    delta.dataset.tone = recentDelta > 0 ? "up" : recentDelta < 0 ? "down" : "flat";
+  }
+  if (deltaMeta) deltaMeta.textContent = ratedRecent.length ? `最近 ${ratedRecent.length} 盘真人计分局` : "暂无真人计分变化";
+
+  const recent = games[0] || null;
+  const primaryEyebrow = document.querySelector("#homePrimaryEyebrow");
+  const primaryTitle = document.querySelector("#homePrimaryTitle");
+  const primaryNote = document.querySelector("#homePrimaryNote");
+  const primaryAction = document.querySelector("#homePrimaryAction");
+  if (recent?.moves?.length) {
+    const result = relativeResult(recent);
+    if (primaryEyebrow) primaryEyebrow.textContent = "复盘 · 上次棋局";
+    if (primaryTitle) primaryTitle.textContent = `复盘与${recent.opponent || "对手"}的上一盘`;
+    if (primaryNote) primaryNote.textContent = `${result} · ${Array.isArray(recent.moves) ? recent.moves.length : 0} 手。先找出最大的转折点，再决定今天练什么。`;
+    if (primaryAction) {
+      primaryAction.textContent = "继续复盘";
+      primaryAction.dataset.targetView = "review";
+      primaryAction.dataset.homeReviewGame = recent.id || "";
+      primaryAction.disabled = false;
+    }
+  } else {
+    if (primaryEyebrow) primaryEyebrow.textContent = "复盘";
+    if (primaryTitle) primaryTitle.textContent = "还没有待复盘棋局";
+    if (primaryNote) primaryNote.textContent = "完成对局后，从最大的转折点继续。";
+    if (primaryAction) {
+      primaryAction.textContent = "完成首盘后解锁";
+      primaryAction.dataset.targetView = "review";
+      delete primaryAction.dataset.homeReviewGame;
+      primaryAction.disabled = true;
+    }
+  }
+
+  const learnProgress = (() => {
+    try { return JSON.parse(localStorage.getItem("qili-learn-progress-v1") || "null"); }
+    catch { return null; }
+  })();
+  const completedLessons = Object.keys(learnProgress?.completed || {}).length;
+  const courseTitle = document.querySelector("#homeCourseTitle");
+  const courseNote = document.querySelector("#homeCourseNote");
+  if (courseTitle) courseTitle.textContent = learnProgress?.lastLessonId ? "继续上次课程" : "开始第一节课程";
+  if (courseNote) courseNote.textContent = completedLessons
+    ? `已完成 ${completedLessons} 节可练习课程，继续推荐的下一课。`
+    : "从基础规则开始，完成后会结合实战推荐下一课。";
+
+  const recentList = document.querySelector("#homeRecentGames");
+  if (!recentList) return;
+  if (!games.length) {
+    recentList.innerHTML = `<div class="home-recent-empty"><strong>${payload?.loadError ? "棋局暂时无法读取" : "还没有棋局"}</strong><small>${payload?.loadError ? "对局服务暂时不可用，请稍后再试。" : "完成第一盘后，这里会出现真实对局和计分变化。"}</small></div>`;
+    return;
+  }
+  recentList.innerHTML = games.slice(0, 3).map((game) => {
+    const result = relativeResult(game);
+    const resultClass = result === "胜" ? "win" : result === "负" ? "loss" : "draw";
+    const date = new Date(game.finishedAt);
+    const when = Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
+    const deltaClass = Number(game.ratingDelta) > 0 ? "up" : Number(game.ratingDelta) < 0 ? "down" : "";
+    return `<button type="button" class="home-recent-row" data-home-review-game="${escapeHtml(game.id)}">
+      <span class="home-recent-result ${resultClass}">${escapeHtml(result === "和棋" ? "和" : result)}</span>
+      <span class="home-recent-copy"><strong>${escapeHtml(game.opponent || "对手")}</strong><small>${escapeHtml(gameSourceLabel(game))} · ${game.color === "red" ? "执红" : "执黑"} · ${Array.isArray(game.moves) ? game.moves.length : 0} 手</small></span>
+      <span class="home-recent-meta"><span class="${deltaClass}">${escapeHtml(ratingDeltaText(game))}</span><small>${escapeHtml(when)}</small></span>
+    </button>`;
+  }).join("");
+  recentList.querySelectorAll("[data-home-review-game]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const game = games.find((item) => String(item.id) === button.dataset.homeReviewGame);
+      if (!game?.moves?.length) return;
+      window.XiangqiPlatform?.switchView?.("review");
+      void startReview(game);
+    });
+  });
+
+  if (primaryAction) {
+    primaryAction.onclick = () => {
+      const game = games.find((item) => String(item.id) === primaryAction.dataset.homeReviewGame);
+      if (game?.moves?.length) void startReview(game);
+    };
+  }
+}
+
 async function loadHistory() {
   if (historyLoading) return;
   historyLoading = true;
@@ -1815,6 +1964,7 @@ async function loadHistory() {
       return { games: localGames };
     }
     if (list) list.innerHTML = `<div class="profile-history-empty"><strong>历史棋局暂时无法读取</strong><p>${escapeHtml(error.message)}</p></div>`;
+    renderHomeDashboard({ games: [], loadError: error.message });
     return null;
   } finally {
     historyLoading = false;
@@ -1891,6 +2041,11 @@ document.querySelectorAll('[data-view="review"], [data-target-view="review"]').f
   button.addEventListener("click", () => void loadReviewGames());
 });
 
+document.querySelector("#homeCourseAction")?.addEventListener("click", () => {
+  window.XiangqiPlatform?.switchView?.("learn");
+  window.QiliLearn?.openHome?.();
+});
+
 window.addEventListener("qili-game-finished", (event) => {
   if (event.detail?.source === "computer" && event.detail?.game) {
     void reportComputerResult(event.detail.game).catch((error) => console.warn("[computer-calibration]", error));
@@ -1936,8 +2091,14 @@ window.QiliIdentity = {
 
 prepareReviewShell();
 renderIdentity();
+renderHomeDashboard({
+  games: loadComputerReviewGames().map((game) => ({ ...game, source: "computer", ratingDelta: null })),
+});
 void loadComputerLevels();
 if (window.location.hash === "#review") void loadReviewGames();
 void ensureIdentity().then(() => {
   void loadHistory();
-}).catch(() => renderIdentity());
+}).catch((error) => {
+  renderIdentity();
+  if (!loadComputerReviewGames().length) renderHomeDashboard({ games: [], loadError: error.message });
+});

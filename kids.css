@@ -33,10 +33,19 @@ body.kids-mode .brand::after {
 body.kids-mode .brand-mark { border-radius:16px; background:var(--k-red); box-shadow:inset 0 -4px #80191626,0 4px var(--k-red-dark); }
 body.kids-mode .brand span { color:#b8c9d4; }
 body.kids-mode .platform-nav-item { min-height:46px; border-radius:12px; color:#bed0da; font-size:13px; font-weight:750; }
-body.kids-mode .platform-nav-item::before { width:9px; height:9px; flex-basis:9px; background:#5c7486; }
+body.kids-mode .platform-nav-item::before {
+  width:30px; height:30px; flex-basis:30px; border-radius:10px;
+  color:#d8e8ef; background:#294a63; font-size:13px; box-shadow:inset 0 -3px #10283a2e;
+}
 body.kids-mode .platform-nav-item:hover { color:#fff; background:#24445e; }
 body.kids-mode .platform-nav-item.active { color:#173149; background:var(--k-yellow); box-shadow:0 4px var(--k-yellow-dark); }
-body.kids-mode .platform-nav-item.active::before { background:var(--k-red); }
+body.kids-mode .platform-nav-item.active::before { color:#fff; background:var(--k-red); box-shadow:inset 0 -3px #80191626; }
+body.kids-mode .platform-subnav { padding-left:53px; }
+body.kids-mode .platform-subnav-item { min-height:30px; color:#8fa9b8; font-size:11px; font-weight:750; }
+body.kids-mode .platform-subnav-item::before { background:#52758b; }
+body.kids-mode .platform-subnav-item:hover,
+body.kids-mode .platform-subnav-item.active { color:#fff; }
+body.kids-mode .platform-subnav-item.active::before { background:var(--k-yellow); box-shadow:0 0 0 3px #f2c34324; }
 body.kids-mode .topbar-actions { border-color:#ffffff1f; }
 body.kids-mode .topbar-actions .button-ghost,
 body.kids-mode .topbar-actions .button-secondary { color:#dbe7ec; border-color:#3d5a70; background:#213e56; }
@@ -81,6 +90,73 @@ body.kids-mode .home-action-card:first-child { border-color:#d84039; background:
 body.kids-mode .home-action-card:nth-child(2)>b { background:var(--k-yellow); }
 body.kids-mode .home-action-card:nth-child(3)>b { background:var(--k-blue); }
 
+/* The signed-in Kids home follows the same playful system as the course map. */
+body.kids-mode .home-dashboard { gap:26px; }
+body.kids-mode .home-welcome { padding:8px 4px 0; }
+body.kids-mode .home-welcome h1 { color:var(--k-ink); font-size:clamp(38px,4vw,56px); letter-spacing:-.045em; }
+body.kids-mode .home-welcome h1 strong { color:var(--k-red); }
+body.kids-mode .home-welcome p { color:#526579; font-size:14px; font-weight:700; }
+body.kids-mode .home-quiet-action { color:var(--k-blue-dark); }
+body.kids-mode .home-section-heading h2 { color:var(--k-ink); font-size:25px; }
+body.kids-mode .home-section-heading>p { color:#647489; font-weight:650; }
+body.kids-mode .home-battle-primary {
+  min-height:324px; border:1px solid #2d8fbe; border-radius:28px; color:#102e41;
+  background:radial-gradient(circle at 91% 4%,#ffffff59,transparent 18rem),linear-gradient(135deg,#76cdea,#5ebfe2 58%,#4faed5);
+  box-shadow:0 9px #318cb7,0 24px 44px #307da424;
+}
+body.kids-mode .home-battle-live { color:#195a78; }
+body.kids-mode .home-battle-live i { background:var(--k-red); box-shadow:0 0 0 5px #fff6; }
+body.kids-mode .home-battle-copy h3 { color:#102e41; font-size:clamp(31px,3.3vw,45px); }
+body.kids-mode .home-battle-copy p { color:#22516a; font-size:13px; font-weight:700; }
+body.kids-mode .home-time-controls button {
+  min-height:76px; border:2px solid #ffffff94; border-radius:17px; color:#3d6072; background:#ffffffa8;
+  box-shadow:0 5px #2d7fa233;
+}
+body.kids-mode .home-time-controls button strong { color:#173149; font-size:19px; }
+body.kids-mode .home-time-controls button small { font-weight:750; }
+body.kids-mode .home-time-controls button:hover { border-color:#fff; background:#ffffffd4; }
+body.kids-mode .home-time-controls button.active {
+  color:#684d0b; border-color:#f7dc7a; background:var(--k-yellow); box-shadow:0 5px var(--k-yellow-dark);
+}
+body.kids-mode .home-time-controls button.active strong { color:#543e0b; }
+body.kids-mode .home-time-controls button.active small { color:#72540b; }
+body.kids-mode .home-battle-cta {
+  min-height:52px; border:1px solid #d33c36; border-radius:15px; color:#fff; background:var(--k-red);
+  box-shadow:0 5px var(--k-red-dark),0 12px 22px #b9322d2b;
+}
+body.kids-mode .home-battle-cta:hover { background:#f15249; }
+body.kids-mode .home-battle-footnote { color:#35677d; font-weight:700; }
+body.kids-mode .home-battle-rating,
+body.kids-mode .home-ai-battle { border-radius:23px; box-shadow:0 7px #d6dee2,0 16px 28px #25384b14; }
+body.kids-mode .home-battle-rating {
+  color:#644a0b; border-color:#edcf61; background:linear-gradient(145deg,#ffdc64,#f2c343); box-shadow:0 7px var(--k-yellow-dark),0 16px 28px #8c691529;
+}
+body.kids-mode .home-battle-rating span,
+body.kids-mode .home-battle-rating small { color:#72540b; font-weight:750; }
+body.kids-mode .home-battle-rating strong { color:#4d3a0d; }
+body.kids-mode .home-ai-battle { border:2px solid #b9dfee; background:linear-gradient(145deg,#fff,#eef9fd); }
+body.kids-mode .home-ai-battle span { color:var(--k-blue-dark); font-weight:850; }
+body.kids-mode .home-ai-battle strong { color:#26364a; }
+body.kids-mode .home-ai-battle small i { color:var(--k-red); }
+body.kids-mode .home-overview {
+  border-color:#d8e1e6; border-radius:22px; background:#fffffff2; box-shadow:0 8px #e4eaed,0 18px 34px #21384a10;
+}
+body.kids-mode .home-overview-card { min-height:138px; border-color:#dde5e9; }
+body.kids-mode .home-overview-card>span { color:var(--k-blue-dark); font-weight:850; }
+body.kids-mode .home-overview-card>strong { color:#26364a; }
+body.kids-mode .home-next-card {
+  min-height:226px; border-color:#d8e1e6; border-radius:22px; background:#fff;
+  box-shadow:0 7px #e3e9ec,0 16px 30px #21384a0f;
+}
+body.kids-mode .home-next-card:nth-child(1) .home-next-index { color:#fff; background:var(--k-blue); box-shadow:0 4px var(--k-blue-dark); }
+body.kids-mode .home-next-card:nth-child(2) .home-next-index { color:#62490a; background:var(--k-yellow); box-shadow:0 4px var(--k-yellow-dark); }
+body.kids-mode .home-next-card:nth-child(3) .home-next-index { color:#fff; background:var(--k-green); box-shadow:0 4px var(--k-green-dark); }
+body.kids-mode .home-next-card h3 { color:#2a3547; }
+body.kids-mode .home-next-card p { color:#687489; font-weight:650; }
+body.kids-mode .home-growth-card,
+body.kids-mode .home-recent-card { border-radius:24px; box-shadow:0 8px #e3e9ec,0 20px 36px #21384a0e; }
+body.kids-mode .home-coach-note { border-radius:18px; background:#173149; }
+
 body.kids-mode .workspace,
 body.kids-mode .platform-page,
 body.kids-mode .learn-page { color:var(--k-ink); }
@@ -116,6 +192,28 @@ body.kids-mode .profile-stat strong { color:var(--k-blue-dark); }
 body.kids-mode .profile-result { border-radius:13px; }
 body.kids-mode .online-page :is(.online-card,.online-lobby-card,.online-room-card) { border-radius:20px; }
 body.kids-mode .online-page .button-primary { box-shadow:0 4px var(--k-red-dark); }
+body.kids-mode .online-lobby-hero,
+body.kids-mode .platform-page-header {
+  border:1px solid #9ed4e7; border-radius:24px; background:linear-gradient(135deg,#e8f8fd,#fffaf0);
+  box-shadow:0 7px #d3eaf2,0 16px 30px #21465b0f;
+}
+body.kids-mode .online-lobby-hero h1,
+body.kids-mode .platform-page-header h1 { color:#213149; }
+body.kids-mode .online-lobby-card,
+body.kids-mode .training-menu,
+body.kids-mode .training-main,
+body.kids-mode .analysis-board-shell,
+body.kids-mode .analysis-side,
+body.kids-mode .profile-identity,
+body.kids-mode .profile-stat,
+body.kids-mode .ability-card,
+body.kids-mode .recent-games-card {
+  border-color:#d8e1e6; border-radius:22px; background:#fff; box-shadow:0 7px #e3e9ec,0 16px 30px #21384a0f;
+}
+body.kids-mode .training-menu-item { border-radius:14px; }
+body.kids-mode .training-menu-item.active { color:#173149; background:#fff3b7; box-shadow:inset 0 0 0 1px #efd46f; }
+body.kids-mode .puzzle-preview { border-color:#b9dfee; background:#f3fbfe; }
+body.kids-mode .profile-avatar { border-radius:18px; background:var(--k-blue); box-shadow:0 5px var(--k-blue-dark); }
 
 @media (max-width:760px) {
   body.kids-mode .brand::after { display:none; }

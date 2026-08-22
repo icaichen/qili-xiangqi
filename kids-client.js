@@ -85,25 +85,29 @@ if (!rules) {
 
   const kidsCopy = [
     [".platform-nav-item[data-view='home']", "我的首页"],
-    [".platform-nav-item[data-view='play']", "去下棋"],
-    [".platform-nav-item[data-view='train']", "小挑战"],
+    [".platform-nav-item[data-view='online']", "去下棋"],
     [".platform-nav-item[data-view='learn']", "学习乐园"],
-    [".platform-nav-item[data-view='review']", "看懂这盘"],
-    [".platform-nav-item[data-view='analysis']", "棋盘研究"],
+    [".platform-nav-item[data-view='review']", "复盘闯关"],
     [".platform-nav-item[data-view='profile']", "我的成长"],
+    [".platform-subnav-item[data-target-view='online']", "找棋友"],
+    [".platform-subnav-item[data-target-view='play']", "挑战电脑"],
+    [".platform-subnav-item[data-target-view='learn']", "课程地图"],
+    [".platform-subnav-item[data-target-view='train']", "每日挑战"],
+    [".platform-subnav-item[data-target-view='review']", "我的棋局"],
+    [".platform-subnav-item[data-target-view='analysis']", "棋盘研究"],
     ["#quickPlayButton", "开始下一盘"],
     ["#openNotationButton", "记谱小课堂"],
   ];
   const kidsHtmlCopy = [
-    [".home-hero .eyebrow", "棋理 KIDS · 下棋 / 学习 / 进步"],
-    [".home-hero h1", "每走一步，<br>都能学会一点。"],
-    [".home-hero>div:first-child>p", "先下一盘，再把没看懂的地方变成一堂小课。不是背答案，而是慢慢学会自己想。"],
-    [".home-action-card:nth-child(1) h2", "来下一盘"],
-    [".home-action-card:nth-child(1) p", "可以找棋友，也可以和电脑练习。大胆走，每一盘都算成长。"],
-    [".home-action-card:nth-child(2) h2", "今天学一小课"],
-    [".home-action-card:nth-child(2) p", "从棋子怎么走，到怎么看攻击和保护。一次学一个规则。"],
-    [".home-action-card:nth-child(3) h2", "看看哪里能更好"],
-    [".home-action-card:nth-child(3) p", "把刚才的棋重新看一遍，找到最值得学会的那一步。"],
+    ["#homeWelcomeNote", "下棋、闯关、收集星星，今天也学会一个新本领。"],
+    ["#homeBattleTitle", "选一局，开始闯关！"],
+    [".home-battle-section>.home-section-heading>p", "先勇敢下一盘，再把没看懂的地方变成小挑战。"],
+    [".home-battle-copy h3", "和棋友来一场"],
+    [".home-battle-copy p", "选一个时间，准备好就去棋盘见！"],
+    [".home-battle-footnote", "也可以邀请朋友进入同一个房间"],
+    [".home-ai-battle strong", "和棋力合适的电脑练一练"],
+    [".home-next-section .home-section-heading h2", "接着上次的进度"],
+    [".home-next-section .home-section-heading>p", "看一盘、学一课、练一题，每次前进一点点。"],
     ["#profileView .platform-page-header h1", "我的成长记录"],
   ];
 
@@ -138,6 +142,10 @@ if (!rules) {
   }
 
   function openKids() {
+    if (!kidsView) {
+      console.error("Qili Kids: course view is missing");
+      return;
+    }
     setKidsMode(true);
     // Paint first and repaint after the shell switches views. This keeps the
     // course usable even when an embedded history adapter throws during URL
