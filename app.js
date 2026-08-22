@@ -82,6 +82,7 @@ const reviewDropzoneElement = document.querySelector("#reviewDropzone");
 const platformViews = {
   home: document.querySelector("#homeView"), play: document.querySelector("#playView"),
   train: document.querySelector("#trainView"), learn: document.querySelector("#learnView"),
+  kids: document.querySelector("#kidsView"),
   review: document.querySelector("#reviewDropzone"), analysis: document.querySelector("#analysisView"),
   profile: document.querySelector("#profileView"),
   online: document.querySelector("#onlineView"),
@@ -1789,8 +1790,13 @@ window.addEventListener("qili-premium-change", () => {
 });
 
 function switchPlatformView(viewName) {
-  const target = platformViews[viewName] ? viewName : "home";
-  const navTarget = target === "online" ? "play" : target;
+  if (viewName === "learn" && document.body.classList.contains("kids-mode") && window.QiliKids?.openCourses) {
+    window.QiliKids.openCourses();
+    return;
+  }
+  const requestedTarget = platformViews[viewName] ? viewName : "home";
+  const target = requestedTarget === "learn" && document.body.classList.contains("kids-mode") ? "kids" : requestedTarget;
+  const navTarget = target === "online" ? "play" : target === "kids" ? "learn" : target;
   Object.entries(platformViews).forEach(([name, element]) => element?.classList.toggle("hidden", name !== target));
   document.querySelectorAll(".platform-nav-item").forEach((item) => item.classList.toggle("active", item.dataset.view === navTarget));
   document.querySelector(".play-only-action")?.classList.toggle("hidden", target !== "play");
@@ -1807,7 +1813,20 @@ function switchPlatformView(viewName) {
   if (target !== "play") closeBoardReplay();
   if (document.body.classList.contains("in-app")) {
     const next = `/#${target}`;
-    if (`${location.pathname}${location.hash}` !== next) history.replaceState(null, "", next);
+    if (`${location.pathname}${location.hash}` !== next) {
+      // A few embedded previews expose a read-only History object. Routing
+      // must never abort the view render just because the URL cannot be
+      // updated; the visible app state is the source of truth here.
+      try {
+        if (typeof window.history?.replaceState === "function") {
+          window.history.replaceState(null, "", next);
+        } else if (location.hash !== `#${target}`) {
+          location.hash = target;
+        }
+      } catch (error) {
+        console.warn("[platform-route] URL sync skipped", error);
+      }
+    }
   }
 }
 

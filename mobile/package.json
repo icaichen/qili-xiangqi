@@ -1,0 +1,21 @@
+{
+  "name": "@qili/mobile",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start:qilichess": "npm --workspace @qili/qilichess run start",
+    "start:kids": "npm --workspace @qili/qilichesskids run start",
+    "ios:qilichess": "npm --workspace @qili/qilichess run ios",
+    "ios:kids": "npm --workspace @qili/qilichesskids run ios",
+    "android:qilichess": "npm --workspace @qili/qilichess run android",
+    "android:kids": "npm --workspace @qili/qilichesskids run android",
+    "check": "npm run check --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

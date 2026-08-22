@@ -1,0 +1,20 @@
+export type PieceColor = 'red' | 'black';
+export type PieceType = 'rook' | 'horse' | 'elephant' | 'advisor' | 'general' | 'cannon' | 'pawn';
+export type Piece = { type: PieceType; color: PieceColor; label: string };
+export type Board = Array<Array<Piece | null>>;
+export type Move = { fromRow: number; fromCol: number; toRow: number; toCol: number };
+
+export const ROWS: 10;
+export const COLS: 9;
+export const RED: 'red';
+export const BLACK: 'black';
+export const OPPOSITE: Readonly<Record<PieceColor, PieceColor>>;
+export const LABELS: Readonly<Record<PieceColor, Readonly<Record<PieceType, string>>>>;
+export function createInitialBoard(): Board;
+export function cloneBoard(board: Board): Board;
+export function applyMove(board: Board, move: Move): { board: Board; captured: Piece | null };
+export function legalMovesForPiece(board: Board, row: number, col: number): Move[];
+export function generateLegalMoves(board: Board, color: PieceColor): Move[];
+export function validateMove(board: Board, color: PieceColor, move: Move): { ok: boolean; reason?: string; move?: Move };
+export function gameStatus(board: Board, sideToMove: PieceColor): { over: boolean; inCheck?: boolean; winner?: PieceColor; reason?: string };
+export function isInCheck(board: Board, color: PieceColor): boolean;

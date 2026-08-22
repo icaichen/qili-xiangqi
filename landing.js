@@ -108,7 +108,6 @@ function setPageTitle(route) {
 
 function leaveAppOverlays() {
   document.body.classList.remove(
-    "kids-mode",
     "modal-open",
     "play-mode",
     "analysis-mode",
@@ -212,10 +211,6 @@ function applyRoute({ replace = true } = {}) {
     if (LEGAL_VIEWS.has(route)) {
       if (location.pathname !== `/${route}`) setUrl(route, { replace: true });
       showLegal(route);
-      return;
-    }
-    if (route === "kids") {
-      hideSplash();
       return;
     }
     if (signedIn) {

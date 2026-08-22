@@ -1219,10 +1219,10 @@ if (root) {
       <div class="learn-skill-grid">${cards}</div>
       <div class="learn-kids-entry">
         <div>
-          <strong>儿童模式</strong>
-          <p>独立的互动课，不和成人技能图混在一起。</p>
+          <strong>儿童课程</strong>
+          <p>儿童版里的互动学习地图：一次一个规则，边走边懂。</p>
         </div>
-        <button class="button button-ghost" id="learnOpenKids" type="button">打开儿童模式</button>
+        <button class="button button-ghost" id="learnOpenKids" type="button">打开儿童课程</button>
       </div>`;
   }
 
@@ -1307,7 +1307,7 @@ if (root) {
       button.addEventListener("click", () => openLesson(button.dataset.openLesson));
     });
     root.querySelector("#learnOpenKids")?.addEventListener("click", () => {
-      document.querySelector("#openKidsMode")?.click();
+      window.QiliKids?.openCourses?.();
     });
     root.querySelector("#learnLessonReset")?.addEventListener("click", () => {
       if (INTERACTIVE[lessonId]) {

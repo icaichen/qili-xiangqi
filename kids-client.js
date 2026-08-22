@@ -1,4 +1,4 @@
-import { KIDS_CHAPTERS } from "./xiangqi-teaching-curriculum.mjs";
+import { KIDS_CHAPTERS, KIDS_PLAYABLE_LESSONS } from "./xiangqi-teaching-curriculum.mjs";
 
 const rules = window.QiliTutorialRules;
 
@@ -7,307 +7,22 @@ if (!rules) {
 } else {
   const { ROWS, COLS, COLORS, createEmptyBoard, piece, generatePseudoMoves, applyMove, legalMovesForPiece, generateLegalMoves, isInCheck } = rules;
 
-  const appShell = document.querySelector(".app-shell");
-  const homeView = document.querySelector("#homeView");
   const topbarActions = document.querySelector(".topbar-actions");
+  const modePreferenceKey = "qili-kids-mode-enabled";
 
   const entryButton = document.createElement("button");
   entryButton.id = "openKidsMode";
   entryButton.className = "button button-ghost kids-mode-entry";
-  entryButton.textContent = "儿童模式";
+  entryButton.type = "button";
+  entryButton.textContent = "儿童版";
+  entryButton.setAttribute("aria-pressed", "false");
   topbarActions?.prepend(entryButton);
 
-  const kidsView = document.createElement("section");
-  kidsView.id = "kidsView";
-  kidsView.className = "platform-view kids-view hidden";
-  homeView?.insertAdjacentElement("afterend", kidsView);
-
-  const LESSONS = [
-    {
-      icon: "宫",
-      title: "找到帅的小城堡",
-      subtitle: "认识九宫",
-      prompt: "帅住在自己的小城堡里。你能在棋盘上点到红方九宫吗？",
-      tip: "红方九宫就在棋盘最下面中央的 3 × 3 交叉点区域。",
-      mode: "zone",
-      zone: (row, col) => row >= 7 && row <= 9 && col >= 3 && col <= 5,
-      success: "找到了！帅不能跑出这座小城堡。",
-      pieces: [[9, 4, "general", COLORS.RED]],
-    },
-    {
-      icon: "帅",
-      title: "帅怎么走？",
-      subtitle: "九宫里走一步",
-      prompt: "帅每次只能走一格。把红帅向左走一步，但别跑出九宫。",
-      tip: "帅只能待在九宫里，每次只能横着或竖着走一格，不能斜着走。",
-      mode: "move",
-      legal: true,
-      pieces: [[9, 4, "general", COLORS.RED], [0, 3, "general", COLORS.BLACK], [5, 3, "pawn", COLORS.RED]],
-      expected: [9, 4, 9, 3],
-      success: "对了！帅一步一步走，而且始终待在九宫里。",
-    },
-    {
-      icon: "车",
-      title: "让车冲上去",
-      subtitle: "车走直线",
-      prompt: "车最喜欢直线冲刺。点红车，再把它送到上面的星星位置。",
-      tip: "车可以横着或直着走，只要路上没人挡住。",
-      mode: "move",
-      pieces: [[8, 4, "rook", COLORS.RED]],
-      expected: [8, 4, 3, 4],
-      success: "漂亮！车沿直线一路冲到了目标。",
-    },
-    {
-      icon: "马",
-      title: "让小马跳一个日",
-      subtitle: "马的基本走法",
-      prompt: "先看看小马怎么跳。点红马，把它跳到左上方的星星。",
-      tip: "马走一个“日”字：先沿一个方向走一格，再斜着拐出去一格。",
-      mode: "move",
-      pieces: [[7, 4, "horse", COLORS.RED]],
-      expected: [7, 4, 5, 3],
-      success: "跳到了！先记住马的“日”字路线，下一关再看它什么时候会被挡住。",
-    },
-    {
-      icon: "马",
-      title: "谁绊住了小马？",
-      subtitle: "认识蹩马腿",
-      prompt: "小马想往左上跳，可它被绊住了。点出真正挡住它的棋子。",
-      tip: "马虽然会走“日”，但紧挨着它的马腿位置不能被堵住。",
-      mode: "identify",
-      pieces: [[7, 4, "horse", COLORS.RED], [6, 4, "pawn", COLORS.RED]],
-      identify: [6, 4],
-      success: "对，就是它！马腿被堵住，对应方向就跳不过去。",
-    },
-    {
-      icon: "炮",
-      title: "给炮搭一座桥",
-      subtitle: "炮架",
-      prompt: "红炮想吃掉黑车。中间刚好有一个棋子当炮架。试试看！",
-      tip: "炮平时像车一样走；吃子时，中间必须刚好隔一个棋子。",
-      mode: "move",
-      pieces: [[7, 4, "cannon", COLORS.RED], [5, 4, "pawn", COLORS.RED], [2, 4, "rook", COLORS.BLACK]],
-      expected: [7, 4, 2, 4],
-      success: "命中！隔着一个炮架，炮才能跳过去吃子。",
-    },
-    {
-      icon: "兵",
-      title: "小兵过河啦",
-      subtitle: "兵的变化",
-      prompt: "这枚兵已经过河了。让它向左走一步。",
-      tip: "兵没过河时只能向前；过河后可以向前、向左、向右，但永远不能后退。",
-      mode: "move",
-      pieces: [[4, 4, "pawn", COLORS.RED]],
-      expected: [4, 4, 4, 3],
-      success: "做对了！过河以后，小兵会多出左右两个方向。",
-    },
-    {
-      icon: "吃",
-      title: "第一次吃子",
-      subtitle: "占领对方位置",
-      prompt: "黑卒挡在前面。用红车把它吃掉。",
-      tip: "吃子就是走到对方棋子所在的位置，并把那枚棋子拿走。",
-      mode: "move",
-      pieces: [[7, 2, "rook", COLORS.RED], [3, 2, "pawn", COLORS.BLACK]],
-      expected: [7, 2, 3, 2],
-      success: "吃到了！你的棋子会占据对方原来的位置。",
-    },
-    {
-      icon: "将",
-      title: "大声喊：将军！",
-      subtitle: "认识将军",
-      prompt: "把红车走到星星位置，让黑将立刻受到攻击。",
-      tip: "当你的棋子下一步可以直接吃掉对方的将或帅，这就叫“将军”。",
-      mode: "move",
-      legal: true,
-      verifyCheck: true,
-      pieces: [[5, 0, "rook", COLORS.RED], [9, 4, "general", COLORS.RED], [6, 4, "pawn", COLORS.RED], [0, 4, "general", COLORS.BLACK]],
-      expected: [5, 0, 5, 4],
-      success: "将军！黑将现在必须马上想办法逃开或挡住攻击。",
-    },
-    {
-      icon: "救",
-      title: "快救救自己的帅",
-      subtitle: "被将军必须应对",
-      prompt: "黑车正在攻击红帅。把红帅移到安全的位置。",
-      tip: "自己的帅被将军时，不能假装没看到。必须立刻躲开、挡住或吃掉威胁。",
-      mode: "move",
-      legal: true,
-      pieces: [[9, 4, "general", COLORS.RED], [5, 4, "rook", COLORS.BLACK]],
-      expected: [9, 4, 9, 3],
-      success: "安全了！被将军时，第一件事永远是先救自己的帅。",
-    },
-    {
-      icon: "照",
-      title: "别让将帅面对面",
-      subtitle: "将帅不能照面",
-      prompt: "红帅和黑将站在同一条直线上。点出现在挡在他们中间的棋子。",
-      tip: "将和帅不能在同一条直线上直接面对面，中间必须有棋子挡住。",
-      mode: "identify",
-      pieces: [[0, 4, "general", COLORS.BLACK], [9, 4, "general", COLORS.RED], [5, 4, "rook", COLORS.RED]],
-      identify: [5, 4],
-      success: "找到了！这枚车一旦离开这条线，就可能让将帅直接照面。",
-    },
-    {
-      icon: "胜",
-      title: "我的第一盘象棋",
-      subtitle: "两步小对局",
-      prompt: "先用红车吃掉黑兵，给黑将一个将军。系统会用一手合法应将回应你。",
-      tip: "这次不是单独练走法。先制造将军，再观察对手怎么应对，最后找到将死。",
-      mode: "mini-game",
-      legal: true,
-      pieces: [[9, 4, "general", COLORS.RED], [3, 3, "horse", COLORS.RED], [2, 0, "rook", COLORS.RED], [0, 4, "general", COLORS.BLACK], [0, 3, "rook", COLORS.BLACK], [0, 5, "cannon", COLORS.BLACK], [1, 0, "rook", COLORS.BLACK], [2, 4, "pawn", COLORS.BLACK]],
-      expectedMoves: [[2, 0, 2, 4], [2, 4, 1, 4]],
-      success: "将死！你完成了第一盘小棋局：将军、看对手回应，再找到最后一击。",
-      finale: true,
-    },
-    {
-      icon: "攻",
-      title: "谁在攻击我？",
-      subtitle: "看见对手的威胁",
-      prompt: "红车正被一枚黑棋盯着。点出正在攻击红车的棋子。",
-      tip: "走棋前先问一句：对手现在正在攻击我的哪枚棋？",
-      mode: "identify",
-      pieces: [[6, 4, "rook", COLORS.RED], [2, 4, "rook", COLORS.BLACK]],
-      identify: [2, 4],
-      failure: "沿着红车所在的直线找一找，哪枚黑棋可以直接走到红车的位置？",
-      success: "看见了！黑车沿着直线正盯着你的红车。",
-    },
-    {
-      icon: "护",
-      title: "谁在保护我？",
-      subtitle: "找到自己的后援",
-      prompt: "红车虽然被攻击，但它并不是孤零零的。点出正在保护红车的红棋。",
-      tip: "一枚棋子被吃以后，如果你能马上把对方吃回来，它就是被保护的。",
-      mode: "identify",
-      pieces: [[6, 4, "rook", COLORS.RED], [8, 3, "horse", COLORS.RED], [2, 4, "rook", COLORS.BLACK]],
-      identify: [8, 3],
-      failure: "想一想：如果黑车吃到红车的位置，哪枚红棋下一步能跳到那里？",
-      success: "对！红马守着红车的位置，这就是保护。",
-    },
-    {
-      icon: "赚",
-      title: "这枚棋可以白吃",
-      subtitle: "吃掉没人保护的棋",
-      prompt: "这枚黑炮没有同伴保护。用红车把它吃掉。",
-      tip: "能吃到对方棋子，而且对手不能马上把你吃回来，通常就是一次赚子。",
-      mode: "move",
-      pieces: [[6, 2, "rook", COLORS.RED], [3, 2, "cannon", COLORS.BLACK]],
-      expected: [6, 2, 3, 2],
-      success: "赚到了！红车吃掉黑炮后，没有黑棋能立刻把它吃回来。",
-    },
-    {
-      icon: "回",
-      title: "等等，对方会反吃",
-      subtitle: "吃之前先找保护者",
-      prompt: "红车看起来能吃黑炮，但先别急。点出吃完以后能马上反吃红车的黑棋。",
-      tip: "看到能吃的棋先别马上动手。先看目标后面有没有对方的保护者。",
-      mode: "identify",
-      pieces: [[7, 4, "rook", COLORS.RED], [4, 4, "cannon", COLORS.BLACK], [4, 0, "rook", COLORS.BLACK]],
-      identify: [4, 0],
-      failure: "假设红车已经站到黑炮的位置，再看哪枚黑棋能沿直线吃到那里。",
-      success: "找到了！黑车保护着黑炮。红车如果贸然吃炮，就会被黑车吃回来。",
-    },
-    {
-      icon: "换",
-      title: "体验一次交换",
-      subtitle: "我吃你，你再吃我",
-      prompt: "用红车吃掉黑马。然后看看黑方会怎么把红车吃回来。",
-      tip: "交换不是白吃：你拿掉对方一枚棋，对方也会拿掉你一枚棋。要比较双方交换掉的东西值不值得。",
-      mode: "move",
-      pieces: [[6, 2, "rook", COLORS.RED], [3, 2, "horse", COLORS.BLACK], [3, 0, "rook", COLORS.BLACK]],
-      expected: [6, 2, 3, 2],
-      autoReply: [3, 0, 3, 2],
-      success: "看到了：红车吃马以后，黑车马上把红车吃回去。这就是一次交换。",
-    },
-    {
-      icon: "算",
-      title: "先算再吃",
-      subtitle: "选安全的目标",
-      prompt: "红车眼前有两个黑兵。一个被保护，一个没人保护。点出可以放心吃的那一个。",
-      tip: "真正开始下棋以后，每次想吃子都先问：我吃完以后，对方能不能马上吃回来？",
-      mode: "identify",
-      pieces: [[7, 4, "rook", COLORS.RED], [4, 4, "pawn", COLORS.BLACK], [4, 0, "rook", COLORS.BLACK], [7, 7, "pawn", COLORS.BLACK]],
-      identify: [7, 7],
-      failure: "先看两个黑兵身后有没有保护者。被黑车保护的那个不是安全目标。",
-      success: "判断正确！先看保护，再决定要不要吃，你已经开始像真正的棋手一样思考了。",
-      finale: true,
-    },
-    {
-      icon: "将",
-      title: "是谁在喊将军？",
-      subtitle: "看见将军",
-      prompt: "红帅正在被攻击。点出喊“将军”的那枚黑棋。",
-      tip: "先看帅所在的横线和直线。哪枚黑棋现在可以直接走到帅的位置？",
-      mode: "identify",
-      pieces: [[9, 4, "general", COLORS.RED], [5, 4, "pawn", COLORS.RED], [9, 0, "rook", COLORS.BLACK], [0, 3, "general", COLORS.BLACK]],
-      identify: [9, 0],
-      failure: "再沿着红帅所在的横线看一遍。中间没有棋子挡住谁？",
-      success: "看见了！黑车沿横线盯住红帅，这就是将军。",
-    },
-    {
-      icon: "逃",
-      title: "先让帅躲开",
-      subtitle: "应将方法一：逃",
-      prompt: "黑车正在将军。把红帅向左走一步，躲到安全位置。",
-      tip: "被将军时，先别做别的事。帅可以走到一个没有被攻击的九宫位置。",
-      mode: "move",
-      legal: true,
-      pieces: [[9, 4, "general", COLORS.RED], [5, 3, "pawn", COLORS.RED], [5, 4, "rook", COLORS.BLACK], [0, 3, "general", COLORS.BLACK]],
-      expected: [9, 4, 9, 3],
-      success: "安全了！“逃”是应对将军的一种办法。",
-    },
-    {
-      icon: "挡",
-      title: "派车来挡住",
-      subtitle: "应将方法二：挡",
-      prompt: "这次帅不用动。把红车走到帅的正前方，挡住黑车的直线。",
-      tip: "直线将军时，可以把一枚棋放进攻击线路，让对方看不到帅。",
-      mode: "move",
-      legal: true,
-      pieces: [[9, 4, "general", COLORS.RED], [8, 0, "rook", COLORS.RED], [5, 4, "rook", COLORS.BLACK], [0, 3, "general", COLORS.BLACK]],
-      expected: [8, 0, 8, 4],
-      success: "挡住了！红车站进攻击线路，红帅安全了。",
-    },
-    {
-      icon: "吃",
-      title: "把威胁拿掉",
-      subtitle: "应将方法三：吃",
-      prompt: "黑车离红帅太近了。用红帅直接吃掉它。",
-      tip: "如果将军的棋没有保护，而且吃完后帅很安全，就可以把威胁直接拿掉。",
-      mode: "move",
-      legal: true,
-      pieces: [[9, 4, "general", COLORS.RED], [8, 4, "rook", COLORS.BLACK], [0, 3, "general", COLORS.BLACK]],
-      expected: [9, 4, 8, 4],
-      success: "威胁消失了！“吃掉将军的棋”也是一种应将办法。",
-    },
-    {
-      icon: "路",
-      title: "他还有路可以逃",
-      subtitle: "将军不等于将死",
-      prompt: "黑将被红车将军了，但棋局还没结束。点出黑将唯一的安全出口。",
-      tip: "将军以后，要检查所有逃、挡、吃。只要还有一种合法回应，就不是将死。",
-      mode: "identify",
-      pieces: [[9, 4, "general", COLORS.RED], [5, 4, "pawn", COLORS.RED], [2, 4, "rook", COLORS.RED], [0, 4, "general", COLORS.BLACK], [0, 5, "rook", COLORS.BLACK]],
-      identify: [0, 3],
-      failure: "黑将不能走进红车控制的直线，也不能走到自己棋子占着的位置。再找一个空着的安全点。",
-      success: "找到了！黑将还能逃到左边，所以这是将军，还不是将死。",
-    },
-    {
-      icon: "胜",
-      title: "关住所有出口",
-      subtitle: "完成一步将死",
-      prompt: "把左边的红车送到星星位置。它会将军，另一辆红车会守住黑将的出口。",
-      tip: "将死要同时做到两件事：将军，而且不给对方留下任何合法回应。",
-      mode: "move",
-      legal: true,
-      verifyMate: true,
-      pieces: [[9, 4, "general", COLORS.RED], [5, 4, "pawn", COLORS.RED], [2, 0, "rook", COLORS.RED], [1, 8, "rook", COLORS.RED], [0, 4, "general", COLORS.BLACK]],
-      expected: [2, 0, 0, 0],
-      success: "将死！一辆车将军，另一辆车守住出口，黑将没有任何合法回应。",
-      finale: true,
-    },
-  ];
+  const kidsView = document.querySelector("#kidsView");
+  const INTRO_LESSON_COUNT = 2;
+  const LEGACY_CHAPTER1_COUNT = 12;
+  const LEGACY_TOTAL_LESSONS = 24;
+  const LESSONS = KIDS_PLAYABLE_LESSONS;
 
   const [CHAPTER1_META, CHAPTER2_META, CHAPTER3_META] = KIDS_CHAPTERS;
   const CHAPTER1_COUNT = CHAPTER1_META.lessonCount;
@@ -316,27 +31,18 @@ if (!rules) {
   const CHAPTER3_START = CHAPTER3_META.lessonStart;
   const CHAPTER3_COUNT = CHAPTER3_META.lessonCount;
   const CHAPTER3_END = CHAPTER3_START + CHAPTER3_COUNT;
-  const conceptIds = KIDS_CHAPTERS.flatMap((chapter) => chapter.conceptIds);
-  const chapterLayoutValid = KIDS_CHAPTERS.every((chapter, index) => {
-    const expectedStart = KIDS_CHAPTERS.slice(0, index).reduce((total, entry) => total + entry.lessonCount, 0);
-    return chapter.lessonStart === expectedStart && chapter.lessonCount === chapter.conceptIds.length;
-  });
-  if (!chapterLayoutValid || conceptIds.length !== LESSONS.length) {
-    console.warn("Qili Kids: chapter metadata and playable lessons are out of sync");
-  }
-  LESSONS.forEach((lesson, index) => {
-    lesson.conceptId = conceptIds[index] || null;
-  });
   const progressKey = "qili-kids-ch1-completed";
   const progressVersionKey = "qili-kids-ch1-version";
   const savedProgress = Number(localStorage.getItem(progressKey) || 0);
   const savedVersion = Number(localStorage.getItem(progressVersionKey) || 1);
   let completed;
-  if (savedVersion < 4) {
-    if (savedVersion < 2) completed = savedProgress >= 9 ? CHAPTER1_COUNT : 0;
-    else if (savedVersion < 3) completed = Math.max(0, Math.min(CHAPTER1_COUNT, savedProgress));
-    else completed = Math.max(0, Math.min(LESSONS.length, savedProgress));
-    localStorage.setItem(progressVersionKey, "4");
+  if (savedVersion < 5) {
+    let legacyCompleted;
+    if (savedVersion < 2) legacyCompleted = savedProgress >= 9 ? LEGACY_CHAPTER1_COUNT : 0;
+    else if (savedVersion < 3) legacyCompleted = Math.max(0, Math.min(LEGACY_CHAPTER1_COUNT, savedProgress));
+    else legacyCompleted = Math.max(0, Math.min(LEGACY_TOTAL_LESSONS, savedProgress));
+    completed = legacyCompleted > 0 ? Math.min(LESSONS.length, legacyCompleted + INTRO_LESSON_COUNT) : 0;
+    localStorage.setItem(progressVersionKey, "5");
     localStorage.setItem(progressKey, String(completed));
   } else {
     completed = Math.max(0, Math.min(LESSONS.length, savedProgress));
@@ -359,7 +65,7 @@ if (!rules) {
   }
 
   function saveProgress() {
-    localStorage.setItem(progressVersionKey, "4");
+    localStorage.setItem(progressVersionKey, "5");
     localStorage.setItem(progressKey, String(completed));
   }
 
@@ -377,20 +83,77 @@ if (!rules) {
     return Math.max(0, Math.min(count, completed - start));
   }
 
+  const kidsCopy = [
+    [".platform-nav-item[data-view='home']", "我的首页"],
+    [".platform-nav-item[data-view='play']", "去下棋"],
+    [".platform-nav-item[data-view='train']", "小挑战"],
+    [".platform-nav-item[data-view='learn']", "学习乐园"],
+    [".platform-nav-item[data-view='review']", "看懂这盘"],
+    [".platform-nav-item[data-view='analysis']", "棋盘研究"],
+    [".platform-nav-item[data-view='profile']", "我的成长"],
+    ["#quickPlayButton", "开始下一盘"],
+    ["#openNotationButton", "记谱小课堂"],
+  ];
+  const kidsHtmlCopy = [
+    [".home-hero .eyebrow", "棋理 KIDS · 下棋 / 学习 / 进步"],
+    [".home-hero h1", "每走一步，<br>都能学会一点。"],
+    [".home-hero>div:first-child>p", "先下一盘，再把没看懂的地方变成一堂小课。不是背答案，而是慢慢学会自己想。"],
+    [".home-action-card:nth-child(1) h2", "来下一盘"],
+    [".home-action-card:nth-child(1) p", "可以找棋友，也可以和电脑练习。大胆走，每一盘都算成长。"],
+    [".home-action-card:nth-child(2) h2", "今天学一小课"],
+    [".home-action-card:nth-child(2) p", "从棋子怎么走，到怎么看攻击和保护。一次学一个规则。"],
+    [".home-action-card:nth-child(3) h2", "看看哪里能更好"],
+    [".home-action-card:nth-child(3) p", "把刚才的棋重新看一遍，找到最值得学会的那一步。"],
+    ["#profileView .platform-page-header h1", "我的成长记录"],
+  ];
+
+  function setKidsCopy(enabled) {
+    kidsCopy.forEach(([selector, label]) => {
+      const element = document.querySelector(selector);
+      if (!element) return;
+      if (!element.dataset.regularLabel) element.dataset.regularLabel = element.textContent.trim();
+      element.textContent = enabled ? label : element.dataset.regularLabel;
+    });
+    const subtitle = document.querySelector(".brand span");
+    if (subtitle) {
+      if (!subtitle.dataset.regularLabel) subtitle.dataset.regularLabel = subtitle.textContent.trim();
+      subtitle.textContent = enabled ? "KIDS · 边下边学" : subtitle.dataset.regularLabel;
+    }
+    kidsHtmlCopy.forEach(([selector, html]) => {
+      const element = document.querySelector(selector);
+      if (!element) return;
+      if (!element.dataset.regularHtml) element.dataset.regularHtml = element.innerHTML;
+      element.innerHTML = enabled ? html : element.dataset.regularHtml;
+    });
+  }
+
+  function setKidsMode(enabled, persist = true) {
+    document.body.classList.toggle("kids-mode", enabled);
+    entryButton.classList.toggle("active", enabled);
+    entryButton.setAttribute("aria-pressed", String(enabled));
+    entryButton.textContent = enabled ? "切换普通版" : "儿童版";
+    setKidsCopy(enabled);
+    if (persist) localStorage.setItem(modePreferenceKey, enabled ? "1" : "0");
+    window.dispatchEvent(new CustomEvent("qili-kids-mode-change", { detail: { enabled } }));
+  }
+
   function openKids() {
-    document.body.classList.add("kids-mode");
-    document.querySelectorAll(".platform-view").forEach((view) => view.classList.add("hidden"));
-    kidsView.classList.remove("hidden");
-    if (window.location.hash !== "#kids") history.replaceState(null, "", "#kids");
+    setKidsMode(true);
+    // Paint first and repaint after the shell switches views. This keeps the
+    // course usable even when an embedded history adapter throws during URL
+    // synchronization or when navigation happens during boot.
     render();
+    try {
+      window.XiangqiPlatform?.switchView?.("kids");
+    } finally {
+      render();
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function closeKids() {
-    document.body.classList.remove("kids-mode");
-    kidsView.classList.add("hidden");
+    screen = "map";
     window.XiangqiPlatform?.switchView?.("home");
-    history.replaceState(null, "", "#home");
   }
 
   function startLesson(index) {
@@ -428,12 +191,12 @@ if (!rules) {
       <div class="kids-shell">
         <header class="kids-topbar">
           <button class="kids-brand" data-kids-home aria-label="回到儿童模式首页">
-            <span class="kids-brand-piece">帅</span>
-            <span><strong>棋理 Kids</strong><small>快乐学中国象棋</small></span>
+            <span class="kids-brand-piece">学</span>
+            <span><strong>儿童课程</strong><small>学习中心 · 互动学习地图</small></span>
           </button>
           <div class="kids-top-stats">
             <span class="kids-star-pill">★ <strong>${starsText()}</strong></span>
-            <button class="kids-adult-exit" data-exit-kids>返回普通模式</button>
+            <button class="kids-adult-exit" data-exit-kids>返回儿童版首页</button>
           </div>
         </header>
         ${inner}
@@ -543,6 +306,7 @@ if (!rules) {
 
   function renderBoard() {
     const lesson = LESSONS[lessonIndex];
+    const tourFriend = lesson.mode === "piece-tour" && !lessonDone ? lesson.piecesToMeet?.[moveStep] : null;
     const points = [];
     for (let row = 0; row < ROWS; row += 1) {
       for (let col = 0; col < COLS; col += 1) {
@@ -554,28 +318,40 @@ if (!rules) {
         const isGoal = Boolean(expected && row === expected[2] && col === expected[3] && !lessonDone);
         const goalClass = isGoal ? " goal" : "";
         const occupiedGoalClass = isGoal && entry ? " occupied-goal" : "";
+        const tourTargetClass = tourFriend && row === tourFriend.at[0] && col === tourFriend.at[1] ? " tour-target" : "";
+        const tourTwinClass = tourFriend && row === tourFriend.twinAt[0] && col === tourFriend.twinAt[1] ? " tour-twin" : "";
         points.push(`
-          <button class="kids-board-point${selectedClass}${targetClass}${goalClass}${occupiedGoalClass}" data-board-row="${row}" data-board-col="${col}" aria-label="第 ${row + 1} 行，第 ${col + 1} 列${entry ? `，${entry.label}` : ""}" style="left:${pos.left};top:${pos.top}">
+          <button class="kids-board-point${selectedClass}${targetClass}${goalClass}${occupiedGoalClass}${tourTargetClass}${tourTwinClass}" data-board-row="${row}" data-board-col="${col}" aria-label="第 ${row + 1} 行，第 ${col + 1} 列${entry ? `，${entry.label}` : ""}${tourTargetClass ? "，当前要认识的棋子" : ""}" style="left:${pos.left};top:${pos.top}">
             ${entry ? `<span class="kids-piece ${entry.color}">${entry.label}</span>` : ""}
           </button>`);
       }
     }
     return `
-      <div class="kids-board" aria-label="儿童互动象棋棋盘">
+      <section class="kids-board-stage">
+        ${tourFriend ? `<div class="kids-tour-guide" aria-live="polite">
+          <span class="kids-tour-count">${moveStep + 1} / ${lesson.piecesToMeet.length}</span>
+          <div class="kids-tour-pair"><b>${tourFriend.label}</b><i>认识</i><b>${tourFriend.blackLabel}</b></div>
+          <div><strong>${tourFriend.name}</strong><p>${tourFriend.job}</p><small>跟着箭头，点一下正在发光的红方棋子。</small></div>
+        </div>` : ""}
+        <div class="kids-board" aria-label="儿童互动象棋棋盘">
+        <span class="kids-board-name" aria-hidden="true">棋仔练习场</span>
         <div class="kids-board-grid"></div>
         <div class="kids-palace-guide black" aria-hidden="true"></div>
         <div class="kids-palace-guide red" aria-hidden="true"></div>
         ${lesson.mode === "zone" && !lessonDone ? '<div class="kids-zone-highlight red-palace" aria-hidden="true"></div>' : ""}
         <div class="kids-river"><span>楚 河</span><span>汉 界</span></div>
         ${points.join("")}
-      </div>`;
+        </div>
+      </section>`;
   }
 
   function renderLesson() {
     const lesson = LESSONS[lessonIndex];
     const chapter = chapterFor(lessonIndex);
     const localIndex = lessonIndex - chapter.start;
-    const promptText = lesson.mode === "mini-game" && moveStep === 1 ? "黑车挡住了将军。现在用红车吃掉它，看看能不能结束小棋局。" : lesson.prompt;
+    const guidedPrompt = lesson.mode === "piece-tour" ? lesson.piecesToMeet?.[moveStep]?.prompt : null;
+    const sequencePrompt = lesson.mode === "identify-sequence" ? lesson.sequence?.[moveStep]?.prompt : null;
+    const promptText = lesson.mode === "mini-game" && moveStep === 1 ? "黑车挡住了将军。现在用红车吃掉它，看看能不能结束小棋局。" : guidedPrompt || sequencePrompt || lesson.prompt;
     const message = feedback || { kind: "neutral", title: "轮到你啦", text: promptText };
     const coachMood = message.kind === "success" ? "happy" : message.kind === "error" ? "hint" : "neutral";
     const coachLabel = message.kind === "success" ? "棋仔也很开心" : message.kind === "error" ? "棋仔给你一点提示" : "棋仔的小提示";
@@ -629,12 +405,12 @@ if (!rules) {
     const replayIndex = chapter.start + chapter.count - 1;
     const nextChapter = KIDS_CHAPTERS[chapter.number];
     const completionCopy = chapter.number === 1
-      ? "你已经认识棋盘、会走第一批棋子，也完成了第一次将死。"
+      ? "你已经认识七位棋子朋友、知道他们的座位和走法，也完成了第一次将死。"
       : chapter.number === 2
         ? "你已经开始会看攻击、保护、反吃和交换，而不是看到能吃就马上吃。"
         : "你已经会看见将军，用逃、挡、吃来救帅，也能判断将军和将死。";
     const skillTags = chapter.number === 1
-      ? "<span>帅与九宫</span><span>车、马、炮、兵</span><span>将军与应将</span><span>将帅不能照面</span>"
+      ? "<span>七位棋子朋友</span><span>帅与九宫</span><span>车、马、炮、兵</span><span>将军与应将</span>"
       : chapter.number === 2
         ? "<span>看见攻击</span><span>找到保护</span><span>识别反吃</span><span>理解交换</span>"
         : "<span>看见将军</span><span>逃、挡、吃</span><span>区分将军与将死</span><span>一步将死</span>";
@@ -662,9 +438,50 @@ if (!rules) {
     if (lessonDone) return;
     const lesson = LESSONS[lessonIndex];
 
+    if (lesson.mode === "piece-tour") {
+      const friend = lesson.piecesToMeet?.[moveStep];
+      if (!friend) return;
+      if (row === friend.at[0] && col === friend.at[1]) {
+        if (moveStep >= lesson.piecesToMeet.length - 1) {
+          moveStep += 1;
+          markLessonComplete();
+        } else {
+          moveStep += 1;
+          const next = lesson.piecesToMeet[moveStep];
+          feedback = { kind: "neutral", title: `认识${friend.label}啦！`, text: `${friend.job} 下一位是${next.name}，继续跟着箭头找。` };
+          render();
+        }
+      } else if (row === friend.twinAt[0] && col === friend.twinAt[1]) {
+        fail(`这是黑方的${friend.blackLabel}`, `它和红方的${friend.label}是一对朋友。现在先点箭头指着的红方${friend.label}。`);
+      } else {
+        fail("跟着会跳动的箭头", friend.hint);
+      }
+      return;
+    }
+
     if (lesson.mode === "zone") {
-      if (lesson.zone?.(row, col)) markLessonComplete();
+      const { minRow, maxRow, minCol, maxCol } = lesson.zone;
+      if (row >= minRow && row <= maxRow && col >= minCol && col <= maxCol) markLessonComplete();
       else fail("再找找", "帅的小城堡在红方底线中央，不在棋盘边上。" );
+      return;
+    }
+
+    if (lesson.mode === "identify-sequence") {
+      const target = lesson.sequence?.[moveStep];
+      if (!target) return;
+      if (row === target.at[0] && col === target.at[1]) {
+        if (moveStep >= lesson.sequence.length - 1) {
+          moveStep += 1;
+          markLessonComplete();
+        } else {
+          moveStep += 1;
+          const next = lesson.sequence[moveStep];
+          feedback = { kind: "neutral", title: `找到${target.name}啦！`, text: `很好。下一位朋友是${next.name}：${next.prompt}` };
+          render();
+        }
+      } else {
+        fail("再看看它站在哪里", target.hint);
+      }
       return;
     }
 
@@ -772,7 +589,22 @@ if (!rules) {
     else renderMap();
   }
 
-  entryButton.addEventListener("click", openKids);
+  entryButton.addEventListener("click", () => {
+    const nextEnabled = !document.body.classList.contains("kids-mode");
+    if (nextEnabled) {
+      openKids();
+      return;
+    }
+    setKidsMode(false);
+    if (kidsView && !kidsView.classList.contains("hidden")) {
+      screen = "map";
+      window.XiangqiPlatform?.switchView?.("learn");
+    }
+  });
+  window.QiliKids = { setMode: setKidsMode, openCourses: openKids, isEnabled: () => document.body.classList.contains("kids-mode") };
+  window.dispatchEvent(new CustomEvent("qili-kids-ready"));
 
-  if (window.location.hash === "#kids") openKids();
+  const savedKidsMode = localStorage.getItem(modePreferenceKey) === "1";
+  setKidsMode(savedKidsMode || window.location.hash === "#kids", false);
+  if (window.location.hash === "#kids" || (savedKidsMode && window.location.hash === "#learn")) openKids();
 }
